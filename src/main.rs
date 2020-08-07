@@ -1,9 +1,13 @@
+mod ast;
 mod scanner;
 mod token;
 
+use ast::AstPrinter;
+use ast::Expr;
 use std::env;
 use std::io;
 use std::io::{Error, ErrorKind};
+use token::{Token, TokenLiteral, TokenType};
 
 pub struct Lox {
     has_error: bool,
@@ -25,6 +29,20 @@ impl Lox {
 }
 
 fn main() -> io::Result<()> {
+    let expr = Expr::Binary(
+        Box::new(Expr::Unary(
+            Token::new(TokenType::MINUS, "-", TokenLiteral::None, 1),
+            Box::new(Expr::Literal(TokenLiteral::Number(123.))),
+        )),
+        Token::new(TokenType::STAR, "*", TokenLiteral::None, 1),
+        Box::new(Expr::Grouping(Box::new(Expr::Literal(
+            TokenLiteral::Number(45.67),
+        )))),
+    );
+
+    let printer = AstPrinter::new();
+    printer.print(&expr);
+
     for argument in env::args() {
         println!("arg :: {}", argument);
     }

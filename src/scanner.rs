@@ -1,4 +1,4 @@
-use crate::token::{Token, TokenType};
+use crate::token::{Token, TokenLiteral, TokenType};
 use crate::Lox;
 use std::fs;
 use std::io;
@@ -55,6 +55,46 @@ pub struct Scanner {
     start: usize,
     current: usize,
     line: usize,
+}
+
+fn is_decimal(c: char) -> bool {
+    match c {
+        '0'..='9' => true,
+        _ => false,
+    }
+}
+
+fn is_alpha(c: char) -> bool {
+    match c {
+        'a'..='z' | 'A'..='Z' | '_' => true,
+        _ => false,
+    }
+}
+
+fn is_alpha_numeric(c: char) -> bool {
+    is_decimal(c) || is_alpha(c)
+}
+
+fn match_keyword(s: &str) -> Option<TokenType> {
+    match s {
+        "and" => Some(TokenType::AND),
+        "class" => Some(TokenType::CLASS),
+        "else" => Some(TokenType::ELSE),
+        "false" => Some(TokenType::FALSE),
+        "for" => Some(TokenType::FOR),
+        "fun" => Some(TokenType::FUN),
+        "if" => Some(TokenType::IF),
+        "nil" => Some(TokenType::NIL),
+        "or" => Some(TokenType::OR),
+        "print" => Some(TokenType::PRINT),
+        "return" => Some(TokenType::RETURN),
+        "super" => Some(TokenType::SUPER),
+        "this" => Some(TokenType::THIS),
+        "true" => Some(TokenType::TRUE),
+        "var" => Some(TokenType::VAR),
+        "while" => Some(TokenType::WHILE),
+        _ => None,
+    }
 }
 
 impl Scanner {
@@ -133,6 +173,17 @@ impl Scanner {
                     while self.peek() != '\n' && !self.is_at_end() {
                         self.advance();
                     }
+                } else if self.match_char('*') {
+                    // multiline comment
+                    while !(self.peek() == '*' && self.peek_2() == '/') && !self.is_at_end() {
+                        if self.peek() == '\n' {
+                            self.line += 1;
+                        }
+                        self.advance();
+                    }
+                    // consume */
+                    self.advance();
+                    self.advance();
                 } else {
                     self.add_token(TokenType::SLASH)
                 }
@@ -141,16 +192,32 @@ impl Scanner {
             // ignore whitespace
             ' ' | '\r' | '\t' => (),
 
+            // newline
             '\n' => self.line += 1,
+
+            // string
+            '"' => self.string(),
+
+            // number
+            '0'..='9' => self.number(),
+
+            // identifier
+            'a'..='z' | 'A'..='Z' | '_' => self.identifier(),
 
             _ => self.lox.error(self.line, "Unexpected Character"),
         };
     }
 
-    fn add_token(&mut self, token_type: TokenType) {
-        let text = &self.source[self.start..self.current];
+    // ===== Helpers =====
 
-        self.tokens.push(Token::new(token_type, text, self.line));
+    fn add_token(&mut self, token_type: TokenType) {
+        self.add_token_with_value(token_type, TokenLiteral::None);
+    }
+
+    fn add_token_with_value(&mut self, token_type: TokenType, literal: TokenLiteral) {
+        let text = &self.source[self.start..self.current];
+        self.tokens
+            .push(Token::new(token_type, text, literal, self.line));
     }
 
     fn match_char(&mut self, expected: char) -> bool {
@@ -171,10 +238,18 @@ impl Scanner {
         }
     }
 
-    // consume next char from source and return
+    fn peek_2(&self) -> char {
+        if self.current + 1 >= self.source.len() {
+            '\0'
+        } else {
+            self.source_char_at(self.current + 1)
+        }
+    }
+
+    // consume and return char and point current to next char
     fn advance(&mut self) -> char {
         self.current += 1;
-        self.source_char_at(self.current)
+        self.source_char_at(self.current - 1)
     }
 
     fn is_at_end(&self) -> bool {
@@ -183,5 +258,68 @@ impl Scanner {
 
     fn source_char_at(&self, i: usize) -> char {
         self.source.as_bytes()[i] as char
+    }
+
+    // ===== literals =====
+    fn string(&mut self) {
+        while self.peek() != '"' && !self.is_at_end() {
+            if self.peek() == '\n' {
+                self.line += 1;
+            }
+            self.advance();
+        }
+
+        if self.is_at_end() {
+            self.lox.error(self.line, "Unterminated string.");
+            return;
+        }
+
+        // closing '"'
+        self.advance();
+
+        let value = &self.source[self.start + 1..self.current - 1].trim();
+        let take = value.clone().into();
+        self.add_token_with_value(TokenType::STRING, TokenLiteral::Str(take));
+    }
+
+    fn number(&mut self) {
+        while is_decimal(self.peek()) {
+            self.advance();
+        }
+
+        if self.peek() == '.' && is_decimal(self.peek_2()) {
+            // consume '.'
+            self.advance();
+
+            while is_decimal(self.peek()) {
+                self.advance();
+            }
+        }
+
+        let value = &self.source[self.start..self.current]
+            .trim()
+            .parse::<f64>()
+            .expect("this is not correct");
+        self.add_token_with_value(TokenType::NUMBER, TokenLiteral::Number(*value));
+    }
+
+    fn identifier(&mut self) {
+        while is_alpha_numeric(self.peek()) {
+            self.advance();
+        }
+
+        let value = &self.source[self.start..self.current].trim();
+
+        let token_type = match_keyword(value);
+
+        let (token_type, literal) = if let Some(token_type) = token_type {
+            (token_type, TokenLiteral::None)
+        } else {
+            (
+                TokenType::IDENTIFIER,
+                TokenLiteral::Identifier(value.clone().into()),
+            )
+        };
+        self.add_token_with_value(token_type, literal);
     }
 }

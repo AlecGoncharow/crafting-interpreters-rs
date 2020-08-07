@@ -1,0 +1,23 @@
+// Your first Lox program!
+print "Hello, world!";
+
+true;  // Not false.
+false; // Not *not* false.
+
+"I am a string";
+"";    // The empty string.
+"123"; // This is a string, not a number.
+
+12.34; // A decimal number.
+1234;  // An integer.
+
+var real_var = "test";
+
+/* 
+
+multi line comment
+
+*/
+
+var after_mult = 00012;
+

@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[allow(non_camel_case_types, dead_code)]
 #[derive(Debug)]
 pub enum TokenType {
@@ -51,18 +53,39 @@ pub enum TokenType {
 }
 
 #[derive(Debug)]
+pub enum TokenLiteral {
+    // probably want some information on where an identifier is declared
+    Identifier(String),
+    Str(String),
+    Number(f64),
+    None,
+}
+
+impl fmt::Display for TokenLiteral {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Identifier(s) | Self::Str(s) => write!(f, "{}", s),
+            Self::Number(n) => write!(f, "{}", &n.to_string()),
+            Self::None => write!(f, "nil"),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct Token {
-    token_type: TokenType,
-    lexeme: String,
+    pub token_type: TokenType,
+    pub lexeme: String,
     //@TODO add literal somehow
-    line: usize,
+    pub literal: TokenLiteral,
+    pub line: usize,
 }
 
 impl Token {
-    pub fn new(token_type: TokenType, lexeme: &str, line: usize) -> Self {
+    pub fn new(token_type: TokenType, lexeme: &str, literal: TokenLiteral, line: usize) -> Self {
         Self {
             token_type,
             lexeme: lexeme.into(),
+            literal,
             line,
         }
     }
