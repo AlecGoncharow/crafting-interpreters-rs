@@ -1,8 +1,28 @@
+use crate::ast::AstPrinter;
+use crate::parser::Parser;
 use crate::token::{Token, TokenLiteral, TokenType};
-use crate::Lox;
 use std::fs;
 use std::io;
 use std::io::Write;
+
+pub struct Lox {
+    has_error: bool,
+}
+
+impl Lox {
+    pub fn new() -> Self {
+        Self { has_error: false }
+    }
+
+    pub fn error(&mut self, line: usize, msg: &str) {
+        self.report(line, "", msg);
+    }
+
+    pub fn report(&mut self, line: usize, whr: &str, msg: &str) {
+        eprintln!("[line {}] Error {}: {}", line, whr, msg);
+        self.has_error = true;
+    }
+}
 
 fn simple_write(s: &str) -> io::Result<()> {
     let stdout = io::stdout();
@@ -13,35 +33,39 @@ fn simple_write(s: &str) -> io::Result<()> {
     Ok(())
 }
 
-pub fn run_file(lox: Lox, path: &str) -> io::Result<()> {
+pub fn run_file(path: &str) -> io::Result<()> {
     let bytes = fs::read(path)?;
-    run(lox, &String::from_utf8(bytes).unwrap())?;
+    run(&String::from_utf8(bytes).unwrap())?;
     Ok(())
 }
 
 /// REPL
-pub fn run_prompt(_lox: Lox) -> io::Result<()> {
+pub fn run_prompt() -> io::Result<()> {
     loop {
         simple_write("> ")?;
 
         let mut input = String::new();
         match io::stdin().read_line(&mut input) {
-            Ok(n) => {
-                println!("{} bytes read", n);
-                println!("{}", input);
-            }
+            Ok(_) => run(&input)?,
             Err(e) => eprintln!("{}", e),
         }
     }
 }
 
-fn run(lox: Lox, source: &str) -> io::Result<()> {
+fn run(source: &str) -> io::Result<()> {
+    let lox = Lox::new();
     let mut scanner = Scanner::new(lox, source);
     let tokens = scanner.scan_tokens();
 
-    for token in tokens {
-        println!("{:?}", token);
-    }
+    let mut parser = Parser::new(tokens);
+    let expr = parser.parse().unwrap();
+
+    if scanner.lox.has_error {
+        return Ok(());
+    };
+
+    let printer = AstPrinter::new();
+    printer.print(&expr);
 
     Ok(())
 }
@@ -115,6 +139,13 @@ impl Scanner {
             self.start = self.current;
             self.scan_token();
         }
+
+        self.tokens.push(Token::new(
+            TokenType::EOF,
+            "\0",
+            TokenLiteral::None,
+            self.line,
+        ));
 
         &self.tokens
     }

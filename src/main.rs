@@ -1,34 +1,14 @@
 mod ast;
-mod scanner;
+mod lox;
+mod parser;
 mod token;
 
-use ast::AstPrinter;
-use ast::Expr;
 use std::env;
 use std::io;
 use std::io::{Error, ErrorKind};
-use token::{Token, TokenLiteral, TokenType};
-
-pub struct Lox {
-    has_error: bool,
-}
-
-impl Lox {
-    pub fn new() -> Self {
-        Self { has_error: false }
-    }
-
-    pub fn error(&mut self, line: usize, msg: &str) {
-        self.report(line, "", msg);
-    }
-
-    pub fn report(&mut self, line: usize, whr: &str, msg: &str) {
-        eprintln!("[line {}] Error {}: {}", line, whr, msg);
-        self.has_error = true;
-    }
-}
 
 fn main() -> io::Result<()> {
+    /*
     let expr = Expr::Binary(
         Box::new(Expr::Unary(
             Token::new(TokenType::MINUS, "-", TokenLiteral::None, 1),
@@ -42,18 +22,18 @@ fn main() -> io::Result<()> {
 
     let printer = AstPrinter::new();
     printer.print(&expr);
+    */
 
     for argument in env::args() {
         println!("arg :: {}", argument);
     }
 
-    let lox = Lox::new();
     let args = env::args();
     match args.len() {
-        1 => scanner::run_prompt(lox),
+        1 => lox::run_prompt(),
         2 => {
             let path = args.last().expect("what");
-            scanner::run_file(lox, &path)
+            lox::run_file(&path)
         }
         _ => Err(Error::new(ErrorKind::Other, "Usage: Foo [script]")),
     }

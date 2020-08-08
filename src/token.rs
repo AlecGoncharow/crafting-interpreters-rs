@@ -1,7 +1,7 @@
 use std::fmt;
 
 #[allow(non_camel_case_types, dead_code)]
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TokenType {
     // Single-character tokens.
     LEFT_PAREN,
@@ -52,9 +52,10 @@ pub enum TokenType {
     EOF,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TokenLiteral {
     // probably want some information on where an identifier is declared
+    Bool(bool),
     Identifier(String),
     Str(String),
     Number(f64),
@@ -66,12 +67,13 @@ impl fmt::Display for TokenLiteral {
         match self {
             Self::Identifier(s) | Self::Str(s) => write!(f, "{}", s),
             Self::Number(n) => write!(f, "{}", &n.to_string()),
+            Self::Bool(b) => write!(f, "{}", b.to_string()),
             Self::None => write!(f, "nil"),
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token {
     pub token_type: TokenType,
     pub lexeme: String,
