@@ -62,13 +62,72 @@ pub enum TokenLiteral {
     None,
 }
 
+impl TokenLiteral {
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Self::Bool(b) => *b,
+            Self::None => false,
+            _ => true,
+        }
+    }
+
+    pub fn number(&self) -> Option<f64> {
+        self.clone().into()
+    }
+}
+
+impl PartialEq for TokenLiteral {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Number(l), Self::Number(r)) => l == r,
+            (Self::Str(l), Self::Str(r)) | (Self::Identifier(l), Self::Identifier(r)) => l == r,
+            (Self::Bool(l), Self::Bool(r)) => l == r,
+            _ => false,
+        }
+    }
+}
+
 impl fmt::Display for TokenLiteral {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Identifier(s) | Self::Str(s) => write!(f, "{}", s),
-            Self::Number(n) => write!(f, "{}", &n.to_string()),
+            Self::Number(n) => {
+                let mut s = n.to_string();
+                if s.ends_with(".0") {
+                    s.truncate(s.len() - 2);
+                }
+
+                write!(f, "{}", s)
+            }
             Self::Bool(b) => write!(f, "{}", b.to_string()),
             Self::None => write!(f, "nil"),
+        }
+    }
+}
+
+impl Into<Option<f64>> for TokenLiteral {
+    fn into(self) -> Option<f64> {
+        match self {
+            Self::Number(n) => Some(n),
+            _ => None,
+        }
+    }
+}
+
+impl Into<Option<bool>> for TokenLiteral {
+    fn into(self) -> Option<bool> {
+        match self {
+            Self::Bool(b) => Some(b),
+            _ => None,
+        }
+    }
+}
+
+impl Into<Option<String>> for TokenLiteral {
+    fn into(self) -> Option<String> {
+        match self {
+            Self::Str(s) | Self::Identifier(s) => Some(s),
+            _ => None,
         }
     }
 }

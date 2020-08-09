@@ -1,4 +1,6 @@
 use crate::ast::AstPrinter;
+use crate::ast::VisitorError;
+use crate::interpreter::Interpreter;
 use crate::parser::Parser;
 use crate::token::{Token, TokenLiteral, TokenType};
 use std::fs;
@@ -65,7 +67,18 @@ fn run(source: &str) -> io::Result<()> {
     };
 
     let printer = AstPrinter::new();
-    printer.print(&expr);
+    let error = printer.print(&expr);
+    if let Err(VisitorError::RuntimeError(token, msg)) = error {
+        scanner.lox.error(token.line, &msg);
+    }
+    let mut interpreter = Interpreter::new();
+    let error = interpreter.evaluate(&expr);
+
+    if let Err(VisitorError::RuntimeError(token, msg)) = error {
+        scanner.lox.error(token.line, &msg);
+    }
+
+    println!("{:?}", interpreter.output());
 
     Ok(())
 }
