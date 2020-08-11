@@ -1,6 +1,5 @@
-use crate::ast::Expr;
+use crate::ast::{Expr, Statement};
 use crate::token::{Token, TokenLiteral, TokenType};
-
 #[derive(Debug)]
 pub enum ParseError {
     Mismatch(Token, String),
@@ -12,6 +11,8 @@ pub struct Parser {
     current: usize,
 }
 
+pub type StatementsResult = Result<Vec<Statement>, ParseError>;
+pub type StatementResult = Result<Statement, ParseError>;
 pub type ParseResult = Result<Expr, ParseError>;
 
 impl Parser {
@@ -23,12 +24,39 @@ impl Parser {
         }
     }
 
-    pub fn parse(&mut self) -> ParseResult {
-        self.tokens.iter().for_each(|token| println!("{:?}", token));
-        self.expression()
+    pub fn parse(&mut self) -> StatementsResult {
+        let mut statements = Vec::new();
+
+        while !self.is_at_end() {
+            statements.push(self.statement()?);
+        }
+
+        Ok(statements)
     }
 
     // ======= START GRAMMAR ======
+
+    fn statement(&mut self) -> StatementResult {
+        if self.match_rule(&[TokenType::PRINT]) {
+            self.print_statement()
+        } else {
+            self.expression_statement()
+        }
+    }
+
+    pub fn print_statement(&mut self) -> StatementResult {
+        let expr = self.expression()?;
+        self.consume(TokenType::SEMICOLON, "Expect ';' after expression.")?;
+
+        Ok(Statement::Print(expr))
+    }
+
+    pub fn expression_statement(&mut self) -> StatementResult {
+        let expr = self.expression()?;
+        self.consume(TokenType::SEMICOLON, "Expect ';' after expression.")?;
+
+        Ok(Statement::Expr(expr))
+    }
 
     fn expression(&mut self) -> ParseResult {
         self.equality()
@@ -37,7 +65,6 @@ impl Parser {
     fn equality(&mut self) -> ParseResult {
         let mut expr = self.comparison()?;
 
-        //while self.match_rule(&[TokenType::BANG_EQUAL, TokenType::EQUAL_EQUAL]) {}
         while self.match_rule(&[TokenType::EQUAL_EQUAL, TokenType::BANG_EQUAL]) {
             let operator = self.previous().clone();
             let right = self.comparison()?;
@@ -102,7 +129,7 @@ impl Parser {
         Ok(match self.advance().token_type {
             TokenType::FALSE => Expr::Literal(TokenLiteral::Bool(false)),
             TokenType::TRUE => Expr::Literal(TokenLiteral::Bool(true)),
-            TokenType::NIL => Expr::Literal(TokenLiteral::None),
+            TokenType::NIL | TokenType::EOF => Expr::Literal(TokenLiteral::None),
             TokenType::NUMBER | TokenType::STRING => Expr::Literal(self.previous().literal.clone()),
             TokenType::LEFT_PAREN => {
                 let expr = self.expression()?;
@@ -166,9 +193,13 @@ impl Parser {
     }
 
     fn previous(&self) -> &Token {
-        self.tokens
-            .get(self.current - 1)
-            .expect("previous machine broke")
+        let current = if self.current == 0 {
+            0
+        } else {
+            self.current - 1
+        };
+
+        self.tokens.get(current).expect("previous machine broke")
     }
 
     // function to get to start of next expr

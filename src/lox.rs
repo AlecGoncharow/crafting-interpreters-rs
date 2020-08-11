@@ -1,7 +1,8 @@
 use crate::ast::AstPrinter;
 use crate::ast::VisitorError;
+use crate::ast::{Expr, Statement};
 use crate::interpreter::Interpreter;
-use crate::parser::Parser;
+use crate::parser::{ParseError, Parser};
 use crate::token::{Token, TokenLiteral, TokenType};
 use std::fs;
 use std::io;
@@ -59,20 +60,30 @@ fn run(source: &str) -> io::Result<()> {
     let mut scanner = Scanner::new(lox, source);
     let tokens = scanner.scan_tokens();
 
+    tokens.iter().for_each(|token| println!("{:?}", token));
     let mut parser = Parser::new(tokens);
-    let expr = parser.parse().unwrap();
+    let stmts = match parser.parse() {
+        Ok(expr) => expr,
+        Err(ParseError::Mismatch(token, msg)) => {
+            scanner.lox.error(token.line, &msg);
+
+            vec![Statement::Expr(Expr::Literal(TokenLiteral::None))]
+        }
+    };
 
     if scanner.lox.has_error {
         return Ok(());
     };
 
-    let printer = AstPrinter::new();
-    let error = printer.print(&expr);
-    if let Err(VisitorError::RuntimeError(token, msg)) = error {
-        scanner.lox.error(token.line, &msg);
+    for stmt in &stmts {
+        let printer = AstPrinter::new();
+        let error = printer.print(stmt.expr());
+        if let Err(VisitorError::RuntimeError(token, msg)) = error {
+            scanner.lox.error(token.line, &msg);
+        }
     }
     let mut interpreter = Interpreter::new();
-    let error = interpreter.evaluate(&expr);
+    let error = interpreter.interpret(&stmts);
 
     if let Err(VisitorError::RuntimeError(token, msg)) = error {
         scanner.lox.error(token.line, &msg);

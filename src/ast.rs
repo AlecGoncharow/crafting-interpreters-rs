@@ -18,10 +18,20 @@ pub trait Visitor {
 
         Ok(())
     }
+
+    #[allow(unused_variables)]
+    fn visit_statement(&mut self, stmt: &Statement) -> VisitorResult {
+        match stmt {
+            Statement::Expr(expr) => self.visit_expr(expr)?,
+            Statement::Print(expr) => {}
+        }
+
+        Ok(())
+    }
 }
 
-pub trait Acceptor<T> {
-    fn accept(&self, visitor: &mut T) -> VisitorResult;
+pub trait Acceptor {
+    fn accept(&self, visitor: &mut dyn Visitor) -> VisitorResult;
 }
 
 pub enum Expr {
@@ -31,8 +41,39 @@ pub enum Expr {
     Unary(Token, Box<Expr>),
 }
 
-impl<T: Visitor> Acceptor<T> for Expr {
-    fn accept(&self, visitor: &mut T) -> VisitorResult {
+pub enum Statement {
+    Expr(Expr),
+    Print(Expr),
+}
+
+impl Statement {
+    pub fn expr(&self) -> &Expr {
+        match self {
+            Statement::Expr(expr) | Statement::Print(expr) => expr,
+        }
+    }
+}
+
+impl Acceptor for Statement {
+    fn accept(&self, visitor: &mut dyn Visitor) -> VisitorResult {
+        visitor.visit_statement(self)
+    }
+}
+
+impl Acceptor for Expr {
+    fn accept(&self, visitor: &mut dyn Visitor) -> VisitorResult {
+        visitor.visit_expr(self)
+    }
+}
+
+impl Acceptor for Box<Statement> {
+    fn accept(&self, visitor: &mut dyn Visitor) -> VisitorResult {
+        visitor.visit_statement(self)
+    }
+}
+
+impl Acceptor for Box<Expr> {
+    fn accept(&self, visitor: &mut dyn Visitor) -> VisitorResult {
         visitor.visit_expr(self)
     }
 }

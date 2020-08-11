@@ -1,8 +1,8 @@
 use crate::ast::Acceptor;
-use crate::ast::Expr;
 use crate::ast::Visitor;
 use crate::ast::VisitorError;
 use crate::ast::VisitorResult;
+use crate::ast::{Expr, Statement};
 use crate::token::Token;
 use crate::token::TokenLiteral;
 use crate::token::TokenType;
@@ -16,9 +16,9 @@ impl Visitor for Interpreter {
     fn visit_expr(&mut self, expr: &Expr) -> VisitorResult {
         match expr {
             Expr::Binary(left, operator, right) => {
-                self.evaluate(left)?;
+                self.execute(left)?;
                 let left = self.stack.pop().unwrap();
-                self.evaluate(right)?;
+                self.execute(right)?;
                 let right = self.stack.pop().unwrap();
 
                 match operator.token_type {
@@ -95,12 +95,12 @@ impl Visitor for Interpreter {
                     _ => unreachable!(),
                 }
             }
-            Expr::Grouping(expression) => self.evaluate(expression)?,
+            Expr::Grouping(expression) => self.execute(expression)?,
             Expr::Literal(literal) => {
                 self.stack.push(literal.clone());
             }
             Expr::Unary(operator, expr) => {
-                self.evaluate(expr)?;
+                self.execute(expr)?;
                 let right = self.stack.pop().unwrap();
 
                 match operator.token_type {
@@ -119,6 +119,18 @@ impl Visitor for Interpreter {
         }
 
         Ok(())
+    }
+
+    fn visit_statement(&mut self, stmt: &Statement) -> VisitorResult {
+        match stmt {
+            Statement::Expr(expr) => self.visit_expr(expr),
+            Statement::Print(expr) => {
+                self.execute(expr)?;
+                let value = self.output().unwrap_or(TokenLiteral::None);
+                println!("{}", value);
+                Ok(())
+            }
+        }
     }
 }
 
@@ -153,8 +165,15 @@ impl Interpreter {
         Self { stack: Vec::new() }
     }
 
-    pub fn evaluate(&mut self, expr: &Expr) -> VisitorResult {
-        expr.accept(self)
+    pub fn interpret(&mut self, stmts: &[Statement]) -> VisitorResult {
+        for stmt in stmts {
+            self.execute(stmt)?;
+        }
+        Ok(())
+    }
+
+    pub fn execute(&mut self, visit: &dyn Acceptor) -> VisitorResult {
+        visit.accept(self)
     }
 
     pub fn output(&mut self) -> Option<TokenLiteral> {
