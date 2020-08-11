@@ -28,7 +28,7 @@ impl Parser {
         let mut statements = Vec::new();
 
         while !self.is_at_end() {
-            statements.push(self.statement()?);
+            statements.push(self.declaration()?);
         }
 
         Ok(statements)
@@ -36,8 +36,46 @@ impl Parser {
 
     // ======= START GRAMMAR ======
 
+    fn declaration(&mut self) -> StatementResult {
+        if self.match_rule(TokenType::VAR) {
+            match self.var_declaration() {
+                Ok(s) => Ok(s),
+                Err(_) => {
+                    self.synchronize();
+                    Ok(Statement::Expr(Expr::none()))
+                }
+            }
+        } else {
+            match self.statement() {
+                Ok(s) => Ok(s),
+                Err(_) => {
+                    self.synchronize();
+                    Ok(Statement::Expr(Expr::none()))
+                }
+            }
+        }
+    }
+
+    fn var_declaration(&mut self) -> StatementResult {
+        let name = self
+            .consume(TokenType::IDENTIFIER, "Expect variable name.")?
+            .clone();
+
+        let mut init = Expr::none();
+        if self.match_rule(TokenType::EQUAL) {
+            init = self.expression()?.clone();
+        }
+
+        self.consume(
+            TokenType::SEMICOLON,
+            "Expect ';' after variable declaration",
+        )?;
+
+        Ok(Statement::Var(name, init))
+    }
+
     fn statement(&mut self) -> StatementResult {
-        if self.match_rule(&[TokenType::PRINT]) {
+        if self.match_rules(&[TokenType::PRINT]) {
             self.print_statement()
         } else {
             self.expression_statement()
@@ -65,7 +103,7 @@ impl Parser {
     fn equality(&mut self) -> ParseResult {
         let mut expr = self.comparison()?;
 
-        while self.match_rule(&[TokenType::EQUAL_EQUAL, TokenType::BANG_EQUAL]) {
+        while self.match_rules(&[TokenType::EQUAL_EQUAL, TokenType::BANG_EQUAL]) {
             let operator = self.previous().clone();
             let right = self.comparison()?;
             expr = Expr::Binary(Box::new(expr), operator, Box::new(right));
@@ -77,7 +115,7 @@ impl Parser {
     fn comparison(&mut self) -> ParseResult {
         let mut expr = self.addition()?;
 
-        while self.match_rule(&[
+        while self.match_rules(&[
             TokenType::GREATER,
             TokenType::GREATER_EQUAL,
             TokenType::LESS,
@@ -94,7 +132,7 @@ impl Parser {
     fn addition(&mut self) -> ParseResult {
         let mut expr = self.multiplication()?;
 
-        while self.match_rule(&[TokenType::MINUS, TokenType::PLUS]) {
+        while self.match_rules(&[TokenType::MINUS, TokenType::PLUS]) {
             let operator = self.previous().clone();
             let right = self.multiplication()?;
             expr = Expr::Binary(Box::new(expr), operator, Box::new(right));
@@ -106,7 +144,7 @@ impl Parser {
     fn multiplication(&mut self) -> ParseResult {
         let mut expr = self.unary()?;
 
-        while self.match_rule(&[TokenType::SLASH, TokenType::STAR]) {
+        while self.match_rules(&[TokenType::SLASH, TokenType::STAR]) {
             let operator = self.previous().clone();
             let right = self.unary()?;
             expr = Expr::Binary(Box::new(expr), operator, Box::new(right));
@@ -116,7 +154,7 @@ impl Parser {
     }
 
     fn unary(&mut self) -> ParseResult {
-        if self.match_rule(&[TokenType::BANG, TokenType::MINUS]) {
+        if self.match_rules(&[TokenType::BANG, TokenType::MINUS]) {
             let operator = self.previous().clone();
             let right = self.unary()?;
             return Ok(Expr::Unary(operator, Box::new(right)));
@@ -136,6 +174,7 @@ impl Parser {
                 self.consume(TokenType::RIGHT_PAREN, "Expect ')' after expression.")?;
                 Expr::Grouping(Box::new(expr))
             }
+            TokenType::IDENTIFIER => Expr::Variable(self.previous().clone()),
             _ => {
                 return Err(ParseError::Mismatch(
                     self.peek().clone(),
@@ -149,7 +188,7 @@ impl Parser {
 
     // ====== HELPERS ========
     // check if EXPR matches any of types of our grammar rule
-    fn match_rule(&mut self, types: &[TokenType]) -> bool {
+    fn match_rules(&mut self, types: &[TokenType]) -> bool {
         for t in types {
             if self.check(*t) {
                 self.advance();
@@ -158,6 +197,10 @@ impl Parser {
         }
 
         false
+    }
+
+    fn match_rule(&mut self, t: TokenType) -> bool {
+        self.match_rules(&[t])
     }
 
     fn advance(&mut self) -> &Token {

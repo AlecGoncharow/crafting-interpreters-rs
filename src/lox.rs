@@ -37,30 +37,31 @@ fn simple_write(s: &str) -> io::Result<()> {
 }
 
 pub fn run_file(path: &str) -> io::Result<()> {
+    let mut interpreter = Interpreter::new();
     let bytes = fs::read(path)?;
-    run(&String::from_utf8(bytes).unwrap())?;
+    run(&mut interpreter, &String::from_utf8(bytes).unwrap())?;
     Ok(())
 }
 
 /// REPL
 pub fn run_prompt() -> io::Result<()> {
+    let mut interpreter = Interpreter::new();
     loop {
         simple_write("> ")?;
 
         let mut input = String::new();
         match io::stdin().read_line(&mut input) {
-            Ok(_) => run(&input)?,
+            Ok(_) => run(&mut interpreter, &input)?,
             Err(e) => eprintln!("{}", e),
         }
     }
 }
 
-fn run(source: &str) -> io::Result<()> {
+fn run(interpreter: &mut Interpreter, source: &str) -> io::Result<()> {
     let lox = Lox::new();
     let mut scanner = Scanner::new(lox, source);
     let tokens = scanner.scan_tokens();
 
-    tokens.iter().for_each(|token| println!("{:?}", token));
     let mut parser = Parser::new(tokens);
     let stmts = match parser.parse() {
         Ok(expr) => expr,
@@ -77,12 +78,11 @@ fn run(source: &str) -> io::Result<()> {
 
     for stmt in &stmts {
         let printer = AstPrinter::new();
-        let error = printer.print(stmt.expr());
+        let error = printer.print(stmt);
         if let Err(VisitorError::RuntimeError(token, msg)) = error {
             scanner.lox.error(token.line, &msg);
         }
     }
-    let mut interpreter = Interpreter::new();
     let error = interpreter.interpret(&stmts);
 
     if let Err(VisitorError::RuntimeError(token, msg)) = error {

@@ -3,6 +3,7 @@ use crate::ast::Visitor;
 use crate::ast::VisitorError;
 use crate::ast::VisitorResult;
 use crate::ast::{Expr, Statement};
+use crate::environment::Environment;
 use crate::token::Token;
 use crate::token::TokenLiteral;
 use crate::token::TokenType;
@@ -10,6 +11,7 @@ use crate::token::TokenType;
 pub struct Interpreter {
     // this might be awful
     stack: Vec<TokenLiteral>,
+    environment: Environment,
 }
 
 impl Visitor for Interpreter {
@@ -97,6 +99,9 @@ impl Visitor for Interpreter {
             Expr::Literal(literal) => {
                 self.stack.push(literal.clone());
             }
+            Expr::Variable(token) => self
+                .stack
+                .push(self.environment.get(&token.lexeme)?.literal().clone()),
             Expr::Unary(operator, expr) => {
                 self.execute(expr)?;
                 let right = self.stack.pop().unwrap();
@@ -126,6 +131,12 @@ impl Visitor for Interpreter {
                 self.execute(expr)?;
                 let value = self.output().unwrap_or(TokenLiteral::None);
                 println!("{}", value);
+                Ok(())
+            }
+            Statement::Var(token, expr) => {
+                self.execute(expr)?;
+                let val = Expr::Literal(self.output().unwrap_or(TokenLiteral::None));
+                self.environment.define(&token.lexeme, val);
                 Ok(())
             }
         }
@@ -160,7 +171,10 @@ fn check_number_operands(
 
 impl Interpreter {
     pub fn new() -> Self {
-        Self { stack: Vec::new() }
+        Self {
+            stack: Vec::new(),
+            environment: Environment::new(),
+        }
     }
 
     pub fn interpret(&mut self, stmts: &[Statement]) -> VisitorResult {
