@@ -93,7 +93,7 @@ impl AstPrinter {
         Ok(())
     }
 
-    pub fn parenthesize(&mut self, name: &str, exprs: &[&Box<Expr>]) -> VisitorResult {
+    pub fn parenthesize(&mut self, name: &str, exprs: &[&Expr]) -> VisitorResult {
         self.buf.push('(');
         self.buf.push_str(name);
         for expr in exprs {

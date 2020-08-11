@@ -50,12 +50,10 @@ impl Visitor for Interpreter {
                                 self.stack.push(TokenLiteral::Str(left_s));
                                 return Ok(());
                             }
-                        } else {
-                            if let TokenLiteral::Number(left_n) = left {
-                                if let TokenLiteral::Number(right_n) = right {
-                                    self.stack.push(TokenLiteral::Number(left_n + right_n));
-                                    return Ok(());
-                                }
+                        } else if let TokenLiteral::Number(left_n) = left {
+                            if let TokenLiteral::Number(right_n) = right {
+                                self.stack.push(TokenLiteral::Number(left_n + right_n));
+                                return Ok(());
                             }
                         }
                         return Err(VisitorError::RuntimeError(

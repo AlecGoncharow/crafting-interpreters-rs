@@ -119,7 +119,7 @@ impl Parser {
         if self.match_rule(&[TokenType::BANG, TokenType::MINUS]) {
             let operator = self.previous().clone();
             let right = self.unary()?;
-            return Ok(Expr::Unary(operator.clone(), Box::new(right)));
+            return Ok(Expr::Unary(operator, Box::new(right)));
         }
 
         self.primary()

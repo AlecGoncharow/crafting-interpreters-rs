@@ -106,17 +106,11 @@ pub struct Scanner {
 }
 
 fn is_decimal(c: char) -> bool {
-    match c {
-        '0'..='9' => true,
-        _ => false,
-    }
+    matches!(c, '0'..='9')
 }
 
 fn is_alpha(c: char) -> bool {
-    match c {
-        'a'..='z' | 'A'..='Z' | '_' => true,
-        _ => false,
-    }
+    matches!(c, 'a'..='z' | 'A'..='Z' | '_')
 }
 
 fn is_alpha_numeric(c: char) -> bool {
@@ -230,7 +224,7 @@ impl Scanner {
                     }
                 } else if self.match_char('*') {
                     // multiline comment
-                    while !(self.peek() == '*' && self.peek_2() == '/') && !self.is_at_end() {
+                    while !((self.peek() == '*' && self.peek_2() == '/') || self.is_at_end()) {
                         if self.peek() == '\n' {
                             self.line += 1;
                         }
@@ -332,8 +326,8 @@ impl Scanner {
         // closing '"'
         self.advance();
 
-        let value = &self.source[self.start + 1..self.current - 1].trim();
-        let take = value.clone().into();
+        let value = self.source[self.start + 1..self.current - 1].trim();
+        let take = String::from(value);
         self.add_token_with_value(TokenType::STRING, TokenLiteral::Str(take));
     }
 
@@ -363,7 +357,7 @@ impl Scanner {
             self.advance();
         }
 
-        let value = &self.source[self.start..self.current].trim();
+        let value = self.source[self.start..self.current].trim();
 
         let token_type = match_keyword(value);
 
@@ -372,7 +366,7 @@ impl Scanner {
         } else {
             (
                 TokenType::IDENTIFIER,
-                TokenLiteral::Identifier(value.clone().into()),
+                TokenLiteral::Identifier(String::from(value)),
             )
         };
         self.add_token_with_value(token_type, literal);
