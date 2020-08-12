@@ -40,17 +40,17 @@ impl Parser {
         if self.match_rule(TokenType::VAR) {
             match self.var_declaration() {
                 Ok(s) => Ok(s),
-                Err(_) => {
+                Err(e) => {
                     self.synchronize();
-                    Ok(Statement::Expr(Expr::none()))
+                    Err(e)
                 }
             }
         } else {
             match self.statement() {
                 Ok(s) => Ok(s),
-                Err(_) => {
+                Err(e) => {
                     self.synchronize();
-                    Ok(Statement::Expr(Expr::none()))
+                    Err(e)
                 }
             }
         }
@@ -75,21 +75,34 @@ impl Parser {
     }
 
     fn statement(&mut self) -> StatementResult {
-        if self.match_rules(&[TokenType::PRINT]) {
+        if self.match_rule(TokenType::PRINT) {
             self.print_statement()
+        } else if self.match_rule(TokenType::LEFT_BRACE) {
+            return Ok(Statement::Block(self.block()?));
         } else {
             self.expression_statement()
         }
     }
 
-    pub fn print_statement(&mut self) -> StatementResult {
+    fn print_statement(&mut self) -> StatementResult {
         let expr = self.expression()?;
         self.consume(TokenType::SEMICOLON, "Expect ';' after expression.")?;
 
         Ok(Statement::Print(expr))
     }
 
-    pub fn expression_statement(&mut self) -> StatementResult {
+    fn block(&mut self) -> StatementsResult {
+        let mut stmts = Vec::new();
+
+        while !(self.check(TokenType::RIGHT_BRACE) || self.is_at_end()) {
+            stmts.push(self.declaration()?);
+        }
+
+        self.consume(TokenType::RIGHT_BRACE, "Expect '}' after block")?;
+        return Ok(stmts);
+    }
+
+    fn expression_statement(&mut self) -> StatementResult {
         let expr = self.expression()?;
         self.consume(TokenType::SEMICOLON, "Expect ';' after expression.")?;
 
@@ -97,7 +110,27 @@ impl Parser {
     }
 
     fn expression(&mut self) -> ParseResult {
-        self.equality()
+        self.assignment()
+    }
+
+    fn assignment(&mut self) -> ParseResult {
+        let expr = self.equality()?;
+
+        if self.match_rule(TokenType::EQUAL) {
+            let equals = self.previous().clone();
+            let value = self.assignment()?;
+
+            if let Expr::Variable(var) = expr {
+                return Ok(Expr::Assign(var, value.into()));
+            } else {
+                return Err(ParseError::Mismatch(
+                    equals.clone(),
+                    "Invalid assignment target.".into(),
+                ));
+            }
+        } else {
+            Ok(expr)
+        }
     }
 
     fn equality(&mut self) -> ParseResult {

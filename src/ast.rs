@@ -10,6 +10,7 @@ pub trait Visitor {
     #[allow(unused_variables)]
     fn visit_expr(&mut self, expr: &Expr) -> VisitorResult {
         match expr {
+            Expr::Assign(token, expr) => {}
             Expr::Binary(left, operator, right) => {}
             Expr::Grouping(expression) => {}
             Expr::Literal(literal) => {}
@@ -26,6 +27,7 @@ pub trait Visitor {
             Statement::Expr(expr) => self.visit_expr(expr)?,
             Statement::Print(expr) => {}
             Statement::Var(token, expr) => {}
+            Statement::Block(stmts) => {}
         }
 
         Ok(())
@@ -38,6 +40,7 @@ pub trait Acceptor {
 
 #[derive(Clone)]
 pub enum Expr {
+    Assign(Token, Box<Expr>),
     Binary(Box<Expr>, Token, Box<Expr>),
     Grouping(Box<Expr>),
     Literal(TokenLiteral),
@@ -62,14 +65,16 @@ pub enum Statement {
     Expr(Expr),
     Print(Expr),
     Var(Token, Expr),
+    Block(Vec<Statement>),
 }
 
 impl Statement {
     #[allow(dead_code)]
-    pub fn expr(&self) -> &Expr {
+    pub fn expr(&self) -> Expr {
         match self {
-            Self::Expr(expr) | Self::Print(expr) => expr,
-            Self::Var(_, expr) => expr,
+            Self::Expr(expr) | Self::Print(expr) => expr.clone(),
+            Self::Var(_, expr) => expr.clone(),
+            _ => Expr::none(),
         }
     }
 }
@@ -128,6 +133,9 @@ impl AstPrinter {
 impl Visitor for AstPrinter {
     fn visit_expr(&mut self, expr: &Expr) -> VisitorResult {
         match expr {
+            Expr::Assign(token, expr) => {
+                self.parenthesize("=", &[&Expr::Literal(token.literal.clone()), expr])?;
+            }
             Expr::Binary(left, operator, right) => {
                 self.parenthesize(&operator.lexeme, &[left, right])?
             }
@@ -150,6 +158,13 @@ impl Visitor for AstPrinter {
             }
             Statement::Var(token, expr) => {
                 self.parenthesize("=", &[&Expr::Literal(token.literal.clone()), expr])?;
+            }
+            Statement::Block(stmts) => {
+                self.buf.push_str("( block ");
+                for stmt in stmts {
+                    self.visit_statement(stmt)?;
+                }
+                self.buf.push_str(")")
             }
         }
 

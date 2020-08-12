@@ -17,6 +17,11 @@ pub struct Interpreter {
 impl Visitor for Interpreter {
     fn visit_expr(&mut self, expr: &Expr) -> VisitorResult {
         match expr {
+            Expr::Assign(token, expr) => {
+                self.execute(expr)?;
+                let val = Expr::Literal(self.output().unwrap_or(TokenLiteral::None));
+                self.environment.assign(&token.lexeme, val)?;
+            }
             Expr::Binary(left, operator, right) => {
                 self.execute(left)?;
                 let left = self.stack.pop().unwrap();
@@ -139,6 +144,10 @@ impl Visitor for Interpreter {
                 self.environment.define(&token.lexeme, val);
                 Ok(())
             }
+            Statement::Block(stmts) => {
+                self.execute_block(stmts)?;
+                Ok(())
+            }
         }
     }
 }
@@ -186,6 +195,20 @@ impl Interpreter {
 
     pub fn execute(&mut self, visit: &dyn Acceptor) -> VisitorResult {
         visit.accept(self)
+    }
+
+    pub fn execute_block(&mut self, stmts: &[Statement]) -> VisitorResult {
+        // make inner env our new env
+        self.environment = Environment::new_enclosed(self.environment.clone());
+
+        for stmt in stmts {
+            self.execute(stmt)?;
+        }
+
+        // return out env to main env
+        self.environment = *self.environment.clone().into_enclosing().unwrap();
+
+        Ok(())
     }
 
     pub fn output(&mut self) -> Option<TokenLiteral> {
