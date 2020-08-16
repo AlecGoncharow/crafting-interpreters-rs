@@ -38,15 +38,24 @@ impl Environment {
                 self.values.insert(name.into(), val);
                 Ok(())
             }
-            None => Err(VisitorError::RuntimeError(
-                Token::new(
-                    TokenType::IDENTIFIER,
-                    name,
-                    TokenLiteral::Identifier(name.into()),
-                    0,
-                ),
-                "Undefined variable.".into(),
-            )),
+            None => {
+                if let Some(inner) = &self.enclosing {
+                    let mut take_inner = inner.clone();
+                    take_inner.assign(name, val)?;
+                    self.enclosing = Some(take_inner);
+                    Ok(())
+                } else {
+                    Err(VisitorError::RuntimeError(
+                        Token::new(
+                            TokenType::IDENTIFIER,
+                            name,
+                            TokenLiteral::Identifier(name.into()),
+                            0,
+                        ),
+                        "Undefined variable.".into(),
+                    ))
+                }
+            }
         }
     }
 

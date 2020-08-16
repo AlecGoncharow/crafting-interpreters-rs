@@ -29,6 +29,7 @@ pub trait Visitor {
             Statement::If(cond, then_branch, else_branch) => {}
             Statement::Print(expr) => {}
             Statement::Var(token, expr) => {}
+            Statement::While(expr, stmt) => {}
             Statement::Block(stmts) => {}
         }
 
@@ -69,6 +70,7 @@ pub enum Statement {
     If(Expr, Box<Statement>, Box<Statement>),
     Print(Expr),
     Var(Token, Expr),
+    While(Expr, Box<Statement>),
     Block(Vec<Statement>),
 }
 
@@ -171,6 +173,12 @@ impl Visitor for AstPrinter {
             }
             Statement::Var(token, expr) => {
                 self.parenthesize("=", &[&Expr::Literal(token.literal.clone()), expr])?;
+            }
+            Statement::While(expr, stmt) => {
+                self.buf.push_str("(while ");
+                self.visit_expr(expr)?;
+                self.visit_statement(stmt)?;
+                self.buf.push_str(")")
             }
             Statement::Block(stmts) => {
                 self.buf.push_str("(block ");

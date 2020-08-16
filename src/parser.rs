@@ -81,6 +81,8 @@ impl Parser {
             Ok(Statement::Block(self.block()?))
         } else if self.match_rule(TokenType::IF) {
             self.if_statment()
+        } else if self.match_rule(TokenType::WHILE) {
+            self.while_statement()
         } else {
             self.expression_statement()
         }
@@ -109,6 +111,15 @@ impl Parser {
             then_branch.into(),
             else_branch.into(),
         ))
+    }
+
+    fn while_statement(&mut self) -> StatementResult {
+        self.consume(TokenType::LEFT_PAREN, "Expect '(' after 'while'.")?;
+        let condition = self.expression()?;
+        self.consume(TokenType::RIGHT_PAREN, "Expect ')' after condition.")?;
+        let body = self.statement()?;
+
+        Ok(Statement::While(condition, body.into()))
     }
 
     fn block(&mut self) -> StatementsResult {

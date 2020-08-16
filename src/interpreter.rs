@@ -159,7 +159,7 @@ impl Visitor for Interpreter {
 
     fn visit_statement(&mut self, stmt: &Statement) -> VisitorResult {
         match stmt {
-            Statement::Expr(expr) => self.visit_expr(expr),
+            Statement::Expr(expr) => self.visit_expr(expr)?,
             Statement::If(cond, then_branch, else_branch) => {
                 self.execute(cond)?;
                 let out = self.output().unwrap();
@@ -169,26 +169,30 @@ impl Visitor for Interpreter {
                 } else {
                     self.execute(else_branch)?;
                 }
-
-                Ok(())
             }
             Statement::Print(expr) => {
                 self.execute(expr)?;
                 let value = self.output().unwrap_or(TokenLiteral::None);
                 println!("{}", value);
-                Ok(())
             }
             Statement::Var(token, expr) => {
                 self.execute(expr)?;
                 let val = Expr::Literal(self.output().unwrap_or(TokenLiteral::None));
                 self.environment.define(&token.lexeme, val);
-                Ok(())
             }
+            Statement::While(expr, stmt) => loop {
+                self.execute(expr)?;
+                let out = self.output().unwrap();
+                if !out.is_truthy() {
+                    break;
+                }
+                self.execute(stmt)?;
+            },
             Statement::Block(stmts) => {
                 self.execute_block(stmts)?;
-                Ok(())
             }
         }
+        Ok(())
     }
 }
 
