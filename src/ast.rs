@@ -15,6 +15,7 @@ pub trait Visitor {
             Expr::Grouping(expression) => {}
             Expr::Literal(literal) => {}
             Expr::Unary(operator, expr) => {}
+            Expr::Logical(left, operator, right) => {}
             Expr::Variable(token) => {}
         }
 
@@ -25,6 +26,7 @@ pub trait Visitor {
     fn visit_statement(&mut self, stmt: &Statement) -> VisitorResult {
         match stmt {
             Statement::Expr(expr) => self.visit_expr(expr)?,
+            Statement::If(cond, then_branch, else_branch) => {}
             Statement::Print(expr) => {}
             Statement::Var(token, expr) => {}
             Statement::Block(stmts) => {}
@@ -45,6 +47,7 @@ pub enum Expr {
     Grouping(Box<Expr>),
     Literal(TokenLiteral),
     Unary(Token, Box<Expr>),
+    Logical(Box<Expr>, Token, Box<Expr>),
     Variable(Token),
 }
 
@@ -63,6 +66,7 @@ impl Expr {
 
 pub enum Statement {
     Expr(Expr),
+    If(Expr, Box<Statement>, Box<Statement>),
     Print(Expr),
     Var(Token, Expr),
     Block(Vec<Statement>),
@@ -136,7 +140,7 @@ impl Visitor for AstPrinter {
             Expr::Assign(token, expr) => {
                 self.parenthesize("=", &[&Expr::Literal(token.literal.clone()), expr])?;
             }
-            Expr::Binary(left, operator, right) => {
+            Expr::Binary(left, operator, right) | Expr::Logical(left, operator, right) => {
                 self.parenthesize(&operator.lexeme, &[left, right])?
             }
             Expr::Grouping(expression) => self.parenthesize("group", &[&expression])?,
@@ -153,6 +157,15 @@ impl Visitor for AstPrinter {
             Statement::Expr(expr) => {
                 self.visit_expr(expr)?;
             }
+            Statement::If(cond, then_branch, else_branch) => {
+                self.buf.push_str("(if ");
+                self.visit_expr(cond)?;
+                self.buf.push_str(" then ");
+                self.visit_statement(then_branch)?;
+                self.buf.push_str(" else ");
+                self.visit_statement(else_branch)?;
+                self.buf.push_str(")")
+            }
             Statement::Print(expr) => {
                 self.parenthesize("print", &[expr])?;
             }
@@ -160,7 +173,7 @@ impl Visitor for AstPrinter {
                 self.parenthesize("=", &[&Expr::Literal(token.literal.clone()), expr])?;
             }
             Statement::Block(stmts) => {
-                self.buf.push_str("( block ");
+                self.buf.push_str("(block ");
                 for stmt in stmts {
                     self.visit_statement(stmt)?;
                 }

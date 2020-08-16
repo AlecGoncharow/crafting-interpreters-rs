@@ -100,6 +100,34 @@ impl Visitor for Interpreter {
                     _ => unreachable!(),
                 }
             }
+
+            Expr::Logical(left, operator, right) => {
+                // only evaluate left to possibly short circut
+                self.execute(left)?;
+                let left = self.stack.pop().unwrap();
+
+                match operator.token_type {
+                    TokenType::OR => {
+                        if left.is_truthy() {
+                            self.stack.push(left);
+                            return Ok(());
+                        }
+                    }
+
+                    TokenType::AND => {
+                        if !left.is_truthy() {
+                            self.stack.push(left);
+                            return Ok(());
+                        }
+                    }
+
+                    _ => unreachable!(),
+                }
+
+                // couldn't short circut, eval right
+                self.execute(right)?;
+            }
+
             Expr::Grouping(expression) => self.execute(expression)?,
             Expr::Literal(literal) => {
                 self.stack.push(literal.clone());
@@ -132,6 +160,18 @@ impl Visitor for Interpreter {
     fn visit_statement(&mut self, stmt: &Statement) -> VisitorResult {
         match stmt {
             Statement::Expr(expr) => self.visit_expr(expr),
+            Statement::If(cond, then_branch, else_branch) => {
+                self.execute(cond)?;
+                let out = self.output().unwrap();
+
+                if out.is_truthy() {
+                    self.execute(then_branch)?;
+                } else {
+                    self.execute(else_branch)?;
+                }
+
+                Ok(())
+            }
             Statement::Print(expr) => {
                 self.execute(expr)?;
                 let value = self.output().unwrap_or(TokenLiteral::None);

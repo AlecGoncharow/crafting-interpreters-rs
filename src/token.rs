@@ -90,7 +90,8 @@ impl PartialEq for TokenLiteral {
 impl fmt::Display for TokenLiteral {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Identifier(s) | Self::Str(s) => write!(f, "{}", s),
+            Self::Identifier(s) => write!(f, "{}", s),
+            Self::Str(s) => write!(f, "\"{}\"", s),
             Self::Number(n) => {
                 let mut s = n.to_string();
                 if s.ends_with(".0") {

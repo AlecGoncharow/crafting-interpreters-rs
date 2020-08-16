@@ -79,6 +79,8 @@ impl Parser {
             self.print_statement()
         } else if self.match_rule(TokenType::LEFT_BRACE) {
             Ok(Statement::Block(self.block()?))
+        } else if self.match_rule(TokenType::IF) {
+            self.if_statment()
         } else {
             self.expression_statement()
         }
@@ -89,6 +91,24 @@ impl Parser {
         self.consume(TokenType::SEMICOLON, "Expect ';' after expression.")?;
 
         Ok(Statement::Print(expr))
+    }
+
+    fn if_statment(&mut self) -> StatementResult {
+        self.consume(TokenType::LEFT_PAREN, "Expect '(' after 'if'.")?;
+        let condition = self.expression()?;
+        self.consume(TokenType::RIGHT_PAREN, "Expect ')' after 'if' condition.")?;
+
+        let then_branch = self.statement()?;
+        let mut else_branch = Statement::Expr(Expr::none());
+        if self.match_rule(TokenType::ELSE) {
+            else_branch = self.statement()?;
+        }
+
+        Ok(Statement::If(
+            condition,
+            then_branch.into(),
+            else_branch.into(),
+        ))
     }
 
     fn block(&mut self) -> StatementsResult {
@@ -114,7 +134,7 @@ impl Parser {
     }
 
     fn assignment(&mut self) -> ParseResult {
-        let expr = self.equality()?;
+        let expr = self.or()?;
 
         if self.match_rule(TokenType::EQUAL) {
             let equals = self.previous().clone();
@@ -131,6 +151,30 @@ impl Parser {
         } else {
             Ok(expr)
         }
+    }
+
+    fn or(&mut self) -> ParseResult {
+        let mut expr = self.and()?;
+
+        while self.match_rule(TokenType::OR) {
+            let operator = self.previous().clone();
+            let right = self.and()?;
+            expr = Expr::Logical(expr.into(), operator, right.into());
+        }
+
+        Ok(expr)
+    }
+
+    fn and(&mut self) -> ParseResult {
+        let mut expr = self.equality()?;
+
+        while self.match_rule(TokenType::AND) {
+            let operator = self.previous().clone();
+            let right = self.equality()?;
+            expr = Expr::Logical(expr.into(), operator, right.into());
+        }
+
+        Ok(expr)
     }
 
     fn equality(&mut self) -> ParseResult {

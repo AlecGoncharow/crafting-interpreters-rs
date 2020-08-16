@@ -1,0 +1,9 @@
+var a = 20;
+
+if (a > 15) {
+	print "cond is true";
+} else {
+	print "cond is false";
+}
+
+
