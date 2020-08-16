@@ -63,7 +63,7 @@ impl Parser {
 
         let mut init = Expr::none();
         if self.match_rule(TokenType::EQUAL) {
-            init = self.expression()?.clone();
+            init = self.expression()?;
         }
 
         self.consume(
@@ -78,7 +78,7 @@ impl Parser {
         if self.match_rule(TokenType::PRINT) {
             self.print_statement()
         } else if self.match_rule(TokenType::LEFT_BRACE) {
-            return Ok(Statement::Block(self.block()?));
+            Ok(Statement::Block(self.block()?))
         } else {
             self.expression_statement()
         }
@@ -99,7 +99,7 @@ impl Parser {
         }
 
         self.consume(TokenType::RIGHT_BRACE, "Expect '}' after block")?;
-        return Ok(stmts);
+        Ok(stmts)
     }
 
     fn expression_statement(&mut self) -> StatementResult {
@@ -121,12 +121,12 @@ impl Parser {
             let value = self.assignment()?;
 
             if let Expr::Variable(var) = expr {
-                return Ok(Expr::Assign(var, value.into()));
+                Ok(Expr::Assign(var, value.into()))
             } else {
-                return Err(ParseError::Mismatch(
-                    equals.clone(),
+                Err(ParseError::Mismatch(
+                    equals,
                     "Invalid assignment target.".into(),
-                ));
+                ))
             }
         } else {
             Ok(expr)
