@@ -1,0 +1,7 @@
+var a;
+var b;
+
+a = "init";
+print a;
+
+print b;

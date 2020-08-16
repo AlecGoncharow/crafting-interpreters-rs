@@ -132,9 +132,16 @@ impl Visitor for Interpreter {
             Expr::Literal(literal) => {
                 self.stack.push(literal.clone());
             }
-            Expr::Variable(token) => self
-                .stack
-                .push(self.environment.get(&token.lexeme)?.literal().clone()),
+            Expr::Variable(token) => {
+                let lookup = self.environment.get(&token.lexeme);
+
+                match lookup {
+                    Ok(v) => self.stack.push(v.literal().clone()),
+                    Err(VisitorError::RuntimeError(_, msg)) => {
+                        return Err(VisitorError::RuntimeError(token.clone(), msg))
+                    }
+                }
+            }
             Expr::Unary(operator, expr) => {
                 self.execute(expr)?;
                 let right = self.stack.pop().unwrap();

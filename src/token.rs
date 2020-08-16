@@ -60,6 +60,7 @@ pub enum TokenLiteral {
     Str(String),
     Number(f64),
     None,
+    Uninit,
 }
 
 impl TokenLiteral {
@@ -102,6 +103,7 @@ impl fmt::Display for TokenLiteral {
             }
             Self::Bool(b) => write!(f, "{}", b.to_string()),
             Self::None => write!(f, "nil"),
+            Self::Uninit => write!(f, "uninitalized"),
         }
     }
 }
@@ -149,6 +151,15 @@ impl Token {
             lexeme: lexeme.into(),
             literal,
             line,
+        }
+    }
+
+    pub fn none() -> Self {
+        Self {
+            token_type: TokenType::NIL,
+            lexeme: "".into(),
+            literal: TokenLiteral::None,
+            line: 0,
         }
     }
 }

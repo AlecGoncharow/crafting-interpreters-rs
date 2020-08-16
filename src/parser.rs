@@ -61,7 +61,7 @@ impl Parser {
             .consume(TokenType::IDENTIFIER, "Expect variable name.")?
             .clone();
 
-        let mut init = Expr::none();
+        let mut init = Expr::Literal(TokenLiteral::Uninit);
         if self.match_rule(TokenType::EQUAL) {
             init = self.expression()?;
         }
@@ -83,6 +83,8 @@ impl Parser {
             self.if_statment()
         } else if self.match_rule(TokenType::WHILE) {
             self.while_statement()
+        } else if self.match_rule(TokenType::FOR) {
+            self.for_statement()
         } else {
             self.expression_statement()
         }
@@ -111,6 +113,43 @@ impl Parser {
             then_branch.into(),
             else_branch.into(),
         ))
+    }
+
+    // desugar for into: init; while cond; body; increment;
+    fn for_statement(&mut self) -> StatementResult {
+        self.consume(TokenType::LEFT_PAREN, "Expect '(' after 'for'.")?;
+
+        let initializer = match self.peek().token_type {
+            TokenType::SEMICOLON => {
+                self.advance();
+                Statement::Expr(Expr::none())
+            }
+            TokenType::VAR => {
+                self.advance();
+                self.var_declaration()?
+            }
+            _ => self.expression_statement()?,
+        };
+
+        let condition = if self.check(TokenType::SEMICOLON) {
+            Expr::Literal(TokenLiteral::Bool(true))
+        } else {
+            self.expression()?
+        };
+        self.consume(TokenType::SEMICOLON, "Expect ';' after loop condition")?;
+
+        let increment = if self.check(TokenType::RIGHT_PAREN) {
+            Statement::Expr(Expr::none())
+        } else {
+            Statement::Expr(self.expression()?)
+        };
+        self.consume(TokenType::RIGHT_PAREN, "Expect ')' after for clauses.")?;
+
+        let body = Statement::Block(vec![self.statement()?, increment]);
+
+        let for_loop = Statement::While(condition, body.into());
+
+        Ok(Statement::Block(vec![initializer, for_loop]))
     }
 
     fn while_statement(&mut self) -> StatementResult {

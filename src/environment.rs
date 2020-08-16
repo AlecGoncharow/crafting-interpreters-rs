@@ -61,13 +61,26 @@ impl Environment {
 
     pub fn get(&self, name: &str) -> Result<&Expr, VisitorError> {
         match self.values.get(name) {
-            Some(expr) => Ok(expr),
+            Some(expr) => match expr {
+                Expr::Literal(TokenLiteral::Uninit) => Err(VisitorError::RuntimeError(
+                    Token::none(),
+                    "Variable used before initialization".into(),
+                )),
+                _ => Ok(expr),
+            },
             None => {
                 // try enclosing
                 if let Some(inner) = &self.enclosing {
-                    if let Ok(v) = inner.get(name) {
-                        return Ok(v);
-                    }
+                    return match inner.get(name) {
+                        Ok(v) => match v {
+                            Expr::Literal(TokenLiteral::Uninit) => Err(VisitorError::RuntimeError(
+                                Token::none(),
+                                "Variable used before initialization".into(),
+                            )),
+                            _ => Ok(v),
+                        },
+                        Err(e) => Err(e),
+                    };
                 }
 
                 Err(VisitorError::RuntimeError(
