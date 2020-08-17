@@ -33,6 +33,8 @@ pub enum TokenType {
 
     // Keywords.
     AND,
+    BREAK,
+    CONTINUE,
     CLASS,
     ELSE,
     FALSE,
@@ -61,6 +63,9 @@ pub enum TokenLiteral {
     Number(f64),
     None,
     Uninit,
+    // probably bad form, but required for interpreter structure
+    Break,
+    Continue,
 }
 
 impl TokenLiteral {
@@ -104,6 +109,8 @@ impl fmt::Display for TokenLiteral {
             Self::Bool(b) => write!(f, "{}", b.to_string()),
             Self::None => write!(f, "nil"),
             Self::Uninit => write!(f, "uninitalized"),
+            Self::Break => write!(f, "break"),
+            Self::Continue => write!(f, "continue"),
         }
     }
 }

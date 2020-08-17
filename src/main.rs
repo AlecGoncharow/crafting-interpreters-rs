@@ -88,6 +88,8 @@ mod test {
     test_ok!(long_expr);
     test_ok!(stmts);
     test_ok!(equals);
+    test_ok!(break_loop);
+    test_ok!(continue_loop);
 
     test_err!(var_err);
     test_err!(mismatch_err);

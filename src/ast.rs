@@ -26,6 +26,7 @@ pub trait Visitor {
     fn visit_statement(&mut self, stmt: &Statement) -> VisitorResult {
         match stmt {
             Statement::Expr(expr) => self.visit_expr(expr)?,
+            Statement::ForIncr(expr) => self.visit_expr(expr)?,
             Statement::If(cond, then_branch, else_branch) => {}
             Statement::Print(expr) => {}
             Statement::Var(token, expr) => {}
@@ -67,6 +68,7 @@ impl Expr {
 
 pub enum Statement {
     Expr(Expr),
+    ForIncr(Expr),
     If(Expr, Box<Statement>, Box<Statement>),
     Print(Expr),
     Var(Token, Expr),
@@ -156,7 +158,7 @@ impl Visitor for AstPrinter {
 
     fn visit_statement(&mut self, stmt: &Statement) -> VisitorResult {
         match stmt {
-            Statement::Expr(expr) => {
+            Statement::Expr(expr) | Statement::ForIncr(expr) => {
                 self.visit_expr(expr)?;
             }
             Statement::If(cond, then_branch, else_branch) => {

@@ -170,7 +170,7 @@ impl Visitor for Interpreter {
 
     fn visit_statement(&mut self, stmt: &Statement) -> VisitorResult {
         match stmt {
-            Statement::Expr(expr) => self.visit_expr(expr)?,
+            Statement::Expr(expr) | Statement::ForIncr(expr) => self.visit_expr(expr)?,
             Statement::If(cond, then_branch, else_branch) => {
                 self.execute(cond)?;
                 let out = self.output().unwrap();
@@ -194,10 +194,18 @@ impl Visitor for Interpreter {
             Statement::While(expr, stmt) => loop {
                 self.execute(expr)?;
                 let out = self.output().unwrap();
+
                 if !out.is_truthy() {
                     break;
                 }
                 self.execute(stmt)?;
+                match self.peek() {
+                    Some(token) => match token {
+                        TokenLiteral::Break => break,
+                        _ => (),
+                    },
+                    None => (),
+                }
             },
             Statement::Block(stmts) => {
                 self.execute_block(stmts)?;
@@ -258,6 +266,21 @@ impl Interpreter {
 
         for stmt in stmts {
             self.execute(stmt)?;
+            match self.peek() {
+                Some(token) => match token {
+                    TokenLiteral::Break => break,
+                    TokenLiteral::Continue => {
+                        // need to do increment in for loop if continue'd, check if last stmt is ForIncr
+                        match stmts.last().unwrap() {
+                            Statement::ForIncr(expr) => self.execute(expr)?,
+                            _ => (),
+                        }
+                        break;
+                    }
+                    _ => (),
+                },
+                None => (),
+            }
         }
 
         // return out env to main env
@@ -268,5 +291,9 @@ impl Interpreter {
 
     pub fn output(&mut self) -> Option<TokenLiteral> {
         self.stack.pop()
+    }
+
+    pub fn peek(&mut self) -> Option<&TokenLiteral> {
+        self.stack.last()
     }
 }

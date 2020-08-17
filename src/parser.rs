@@ -141,7 +141,7 @@ impl Parser {
         let increment = if self.check(TokenType::RIGHT_PAREN) {
             Statement::Expr(Expr::none())
         } else {
-            Statement::Expr(self.expression()?)
+            Statement::ForIncr(self.expression()?)
         };
         self.consume(TokenType::RIGHT_PAREN, "Expect ')' after for clauses.")?;
 
@@ -295,6 +295,8 @@ impl Parser {
             TokenType::FALSE => Expr::Literal(TokenLiteral::Bool(false)),
             TokenType::TRUE => Expr::Literal(TokenLiteral::Bool(true)),
             TokenType::NIL | TokenType::EOF => Expr::Literal(TokenLiteral::None),
+            TokenType::CONTINUE => Expr::Literal(TokenLiteral::Continue),
+            TokenType::BREAK => Expr::Literal(TokenLiteral::Break),
             TokenType::NUMBER | TokenType::STRING => Expr::Literal(self.previous().literal.clone()),
             TokenType::LEFT_PAREN => {
                 let expr = self.expression()?;

@@ -117,6 +117,8 @@ fn is_alpha_numeric(c: char) -> bool {
 fn match_keyword(s: &str) -> Option<TokenType> {
     match s {
         "and" => Some(TokenType::AND),
+        "break" => Some(TokenType::BREAK),
+        "continue" => Some(TokenType::CONTINUE),
         "class" => Some(TokenType::CLASS),
         "else" => Some(TokenType::ELSE),
         "false" => Some(TokenType::FALSE),
