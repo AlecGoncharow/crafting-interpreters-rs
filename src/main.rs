@@ -45,7 +45,6 @@ fn main() -> io::Result<()> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::fs;
     static PROJECT_PATH: &'static str = env!("CARGO_MANIFEST_DIR");
     static TESTS_PATH: &'static str = "/tests/";
 
