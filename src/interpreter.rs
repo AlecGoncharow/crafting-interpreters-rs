@@ -97,6 +97,10 @@ impl Visitor for Interpreter {
                         ));
                     }
 
+                    TokenType::EQUAL_EQUAL => {
+                        self.stack.push(TokenLiteral::Bool(left == right));
+                    }
+
                     _ => unreachable!(),
                 }
             }

@@ -1,12 +1,12 @@
 use crate::ast::AstPrinter;
 use crate::ast::VisitorError;
-use crate::ast::{Expr, Statement};
 use crate::interpreter::Interpreter;
 use crate::parser::{ParseError, Parser};
 use crate::token::{Token, TokenLiteral, TokenType};
 use std::fs;
 use std::io;
 use std::io::Write;
+use std::io::{Error, ErrorKind};
 
 pub struct Lox {
     has_error: bool,
@@ -68,12 +68,8 @@ fn run(interpreter: &mut Interpreter, source: &str) -> io::Result<()> {
         Err(ParseError::Mismatch(token, msg)) => {
             scanner.lox.error(token.line, &msg);
 
-            vec![Statement::Expr(Expr::Literal(TokenLiteral::None))]
+            return Err(Error::new(ErrorKind::Other, msg));
         }
-    };
-
-    if scanner.lox.has_error {
-        return Ok(());
     };
 
     for stmt in &stmts {
@@ -87,6 +83,7 @@ fn run(interpreter: &mut Interpreter, source: &str) -> io::Result<()> {
 
     if let Err(VisitorError::RuntimeError(token, msg)) = error {
         scanner.lox.error(token.line, &msg);
+        return Err(Error::new(ErrorKind::Other, msg));
     }
 
     println!("{:?}", interpreter.output());

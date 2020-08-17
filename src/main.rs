@@ -25,6 +25,7 @@ fn main() -> io::Result<()> {
     let printer = AstPrinter::new();
     printer.print(&expr);
     */
+    println!("{}", env!("CARGO_MANIFEST_DIR"));
 
     for argument in env::args() {
         println!("arg :: {}", argument);
@@ -39,4 +40,56 @@ fn main() -> io::Result<()> {
         }
         _ => Err(Error::new(ErrorKind::Other, "Usage: Foo [script]")),
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::fs;
+    static PROJECT_PATH: &'static str = env!("CARGO_MANIFEST_DIR");
+    static TESTS_PATH: &'static str = "/tests/";
+
+    macro_rules! test_ok {
+        ($name:ident) => {
+            #[test]
+            fn $name() {
+                let run = run_str(&stringify!($name));
+                assert!(run.is_ok());
+            }
+        };
+    }
+
+    macro_rules! test_err {
+        ($name:ident) => {
+            #[test]
+            fn $name() {
+                let run = run_str(&stringify!($name));
+                assert!(run.is_err());
+            }
+        };
+    }
+
+    fn make_path(s: &str) -> String {
+        PROJECT_PATH.to_owned() + TESTS_PATH + s + ".lox"
+    }
+
+    fn run_str(s: &str) -> io::Result<()> {
+        let path = make_path(s);
+        lox::run_file(&path)
+    }
+
+    test_ok!(empty_file);
+    test_ok!(blocks);
+    test_ok!(branch);
+    test_ok!(expr);
+    test_ok!(exprs);
+    test_ok!(for_loop);
+    test_ok!(while_loop);
+    test_ok!(logical);
+    test_ok!(long_expr);
+    test_ok!(stmts);
+    test_ok!(equals);
+
+    test_err!(var_err);
+    test_err!(mismatch_err);
 }
