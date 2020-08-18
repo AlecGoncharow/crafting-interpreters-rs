@@ -1,3 +1,4 @@
+use crate::ast::{Expr, Statement};
 use std::fmt;
 
 #[allow(non_camel_case_types, dead_code)]
@@ -90,6 +91,18 @@ impl PartialEq for TokenLiteral {
             (Self::Bool(l), Self::Bool(r)) => l == r,
             _ => false,
         }
+    }
+}
+
+impl From<TokenLiteral> for Expr {
+    fn from(token: TokenLiteral) -> Self {
+        Self::Literal(token)
+    }
+}
+
+impl From<TokenLiteral> for Statement {
+    fn from(token: TokenLiteral) -> Self {
+        Self::Expr(Expr::Literal(token))
     }
 }
 

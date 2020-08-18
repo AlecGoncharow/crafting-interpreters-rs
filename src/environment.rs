@@ -1,11 +1,12 @@
 use crate::ast::Expr;
+use crate::ast::Statement;
 use crate::ast::VisitorError;
 use crate::token::{Token, TokenLiteral, TokenType};
 use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct Environment {
-    values: HashMap<String, Expr>,
+    values: HashMap<String, Statement>,
     enclosing: Option<Box<Environment>>,
 }
 
@@ -28,11 +29,11 @@ impl Environment {
         self.enclosing
     }
 
-    pub fn define(&mut self, name: &str, val: Expr) {
+    pub fn define(&mut self, name: &str, val: Statement) {
         self.values.insert(name.into(), val);
     }
 
-    pub fn assign(&mut self, name: &str, val: Expr) -> Result<(), VisitorError> {
+    pub fn assign(&mut self, name: &str, val: Statement) -> Result<(), VisitorError> {
         match self.values.get(name) {
             Some(_) => {
                 self.values.insert(name.into(), val);
@@ -59,25 +60,33 @@ impl Environment {
         }
     }
 
-    pub fn get(&self, name: &str) -> Result<&Expr, VisitorError> {
-        match self.values.get(name) {
-            Some(expr) => match expr {
-                Expr::Literal(TokenLiteral::Uninit) => Err(VisitorError::RuntimeError(
-                    Token::none(),
-                    "Variable used before initialization".into(),
-                )),
-                _ => Ok(expr),
+    pub fn get(&self, name: &str) -> Result<&Statement, VisitorError> {
+        return match self.values.get(name) {
+            Some(stmt) => match stmt {
+                Statement::Expr(expr) => match expr {
+                    Expr::Literal(TokenLiteral::Uninit) => Err(VisitorError::RuntimeError(
+                        Token::none(),
+                        "Variable used before initialization".into(),
+                    )),
+                    _ => Ok(stmt),
+                },
+                _ => Ok(stmt),
             },
             None => {
                 // try enclosing
                 if let Some(inner) = &self.enclosing {
                     return match inner.get(name) {
-                        Ok(v) => match v {
-                            Expr::Literal(TokenLiteral::Uninit) => Err(VisitorError::RuntimeError(
-                                Token::none(),
-                                "Variable used before initialization".into(),
-                            )),
-                            _ => Ok(v),
+                        Ok(stmt) => match stmt {
+                            Statement::Expr(expr) => match expr {
+                                Expr::Literal(TokenLiteral::Uninit) => {
+                                    Err(VisitorError::RuntimeError(
+                                        Token::none(),
+                                        "Variable used before initialization".into(),
+                                    ))
+                                }
+                                _ => Ok(stmt),
+                            },
+                            _ => Ok(stmt),
                         },
                         Err(e) => Err(e),
                     };
@@ -93,6 +102,6 @@ impl Environment {
                     "Undefined variable.".into(),
                 ))
             }
-        }
+        };
     }
 }

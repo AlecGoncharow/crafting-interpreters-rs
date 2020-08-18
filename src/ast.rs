@@ -1,3 +1,5 @@
+use crate::environment::Environment;
+use crate::interpreter::Interpreter;
 use crate::token::{Token, TokenLiteral};
 
 pub enum VisitorError {
@@ -12,6 +14,7 @@ pub trait Visitor {
         match expr {
             Expr::Assign(token, expr) => {}
             Expr::Binary(left, operator, right) => {}
+            Expr::Call(callee, paren, arguments) => {}
             Expr::Grouping(expression) => {}
             Expr::Literal(literal) => {}
             Expr::Unary(operator, expr) => {}
@@ -27,6 +30,7 @@ pub trait Visitor {
         match stmt {
             Statement::Expr(expr) => self.visit_expr(expr)?,
             Statement::ForIncr(expr) => self.visit_expr(expr)?,
+            Statement::Function(name, args, body) => {}
             Statement::If(cond, then_branch, else_branch) => {}
             Statement::Print(expr) => {}
             Statement::Var(token, expr) => {}
@@ -42,10 +46,11 @@ pub trait Acceptor {
     fn accept(&self, visitor: &mut dyn Visitor) -> VisitorResult;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Expr {
     Assign(Token, Box<Expr>),
     Binary(Box<Expr>, Token, Box<Expr>),
+    Call(Box<Expr>, Token, Vec<Expr>),
     Grouping(Box<Expr>),
     Literal(TokenLiteral),
     Unary(Token, Box<Expr>),
@@ -66,9 +71,17 @@ impl Expr {
     }
 }
 
+impl From<Expr> for Statement {
+    fn from(expr: Expr) -> Self {
+        Self::Expr(expr)
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum Statement {
     Expr(Expr),
     ForIncr(Expr),
+    Function(Token, Vec<Token>, Vec<Statement>),
     If(Expr, Box<Statement>, Box<Statement>),
     Print(Expr),
     Var(Token, Expr),
@@ -84,6 +97,40 @@ impl Statement {
             Self::Var(_, expr) => expr.clone(),
             _ => Expr::none(),
         }
+    }
+
+    pub fn arity(&self) -> usize {
+        match self {
+            Self::Function(_, args, _) => args.len(),
+            _ => 0,
+        }
+    }
+
+    pub fn call(
+        &mut self,
+        interpreter: &mut Interpreter,
+        args: Vec<TokenLiteral>,
+    ) -> Result<Expr, VisitorError> {
+        match self {
+            Self::Function(_name, params, body) => {
+                let mut environment = Environment::new_enclosed(interpreter.environment.clone());
+
+                for i in 0..params.len() {
+                    environment.define(
+                        &params.get(i).unwrap().lexeme,
+                        args.get(i).unwrap().clone().into(),
+                    );
+                }
+
+                interpreter.environment = environment;
+                interpreter.execute_block(body)?;
+                interpreter.environment =
+                    *interpreter.environment.clone().into_enclosing().unwrap();
+            }
+            _ => unimplemented!(),
+        }
+
+        Ok(Expr::none())
     }
 }
 
@@ -147,6 +194,15 @@ impl Visitor for AstPrinter {
             Expr::Binary(left, operator, right) | Expr::Logical(left, operator, right) => {
                 self.parenthesize(&operator.lexeme, &[left, right])?
             }
+            Expr::Call(callee, _, arguments) => {
+                self.buf.push_str("(call ");
+                self.visit_expr(callee)?;
+                for arg in arguments {
+                    self.buf.push(' ');
+                    self.visit_expr(arg)?;
+                }
+                self.buf.push(')');
+            }
             Expr::Grouping(expression) => self.parenthesize("group", &[&expression])?,
             Expr::Literal(literal) => self.buf.push_str(&literal.to_string()),
             Expr::Unary(operator, expr) => self.parenthesize(&operator.lexeme, &[&expr])?,
@@ -168,7 +224,20 @@ impl Visitor for AstPrinter {
                 self.visit_statement(then_branch)?;
                 self.buf.push_str(" else ");
                 self.visit_statement(else_branch)?;
-                self.buf.push_str(")")
+                self.buf.push(')');
+            }
+            Statement::Function(name, args, body) => {
+                self.buf.push_str("(func_decl ");
+                self.buf.push_str(&name.lexeme);
+                self.buf.push(' ');
+                args.iter()
+                    .for_each(|arg| self.buf.push_str(&(arg.lexeme.clone() + " ")));
+                self.buf.push_str("(block ");
+                for stmt in body {
+                    self.visit_statement(stmt)?;
+                }
+                self.buf.push(')');
+                self.buf.push(')');
             }
             Statement::Print(expr) => {
                 self.parenthesize("print", &[expr])?;
@@ -180,14 +249,14 @@ impl Visitor for AstPrinter {
                 self.buf.push_str("(while ");
                 self.visit_expr(expr)?;
                 self.visit_statement(stmt)?;
-                self.buf.push_str(")")
+                self.buf.push(')');
             }
             Statement::Block(stmts) => {
                 self.buf.push_str("(block ");
                 for stmt in stmts {
                     self.visit_statement(stmt)?;
                 }
-                self.buf.push_str(")")
+                self.buf.push(')');
             }
         }
 

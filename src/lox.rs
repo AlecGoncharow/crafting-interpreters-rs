@@ -65,7 +65,7 @@ fn run(interpreter: &mut Interpreter, source: &str) -> io::Result<()> {
     let mut parser = Parser::new(tokens);
     let stmts = match parser.parse() {
         Ok(expr) => expr,
-        Err(ParseError::Mismatch(token, msg)) => {
+        Err(ParseError::Mismatch(token, msg) | ParseError::TooManyArgs(token, msg)) => {
             scanner.lox.error(token.line, &msg);
 
             return Err(Error::new(ErrorKind::Other, msg));

@@ -10,8 +10,8 @@ use crate::token::TokenType;
 
 pub struct Interpreter {
     // this might be awful
-    stack: Vec<TokenLiteral>,
-    environment: Environment,
+    pub stack: Vec<TokenLiteral>,
+    pub environment: Environment,
 }
 
 impl Visitor for Interpreter {
@@ -19,8 +19,8 @@ impl Visitor for Interpreter {
         match expr {
             Expr::Assign(token, expr) => {
                 self.execute(expr)?;
-                let val = Expr::Literal(self.output().unwrap_or(TokenLiteral::None));
-                self.environment.assign(&token.lexeme, val)?;
+                let val: Expr = self.output().unwrap_or(TokenLiteral::None).into();
+                self.environment.assign(&token.lexeme, val.into())?;
             }
             Expr::Binary(left, operator, right) => {
                 self.execute(left)?;
@@ -105,6 +105,41 @@ impl Visitor for Interpreter {
                 }
             }
 
+            Expr::Call(callee, paren, arguments) => {
+                self.execute(callee)?;
+                let callee_name = self.output().unwrap();
+                let mut function = self.environment.get(&callee_name.to_string())?.clone();
+                match function {
+                    Statement::Function(..) => (),
+                    _ => {
+                        return Err(VisitorError::RuntimeError(
+                            paren.clone(),
+                            "Can only call functions and classes.".into(),
+                        ))
+                    }
+                }
+
+                if arguments.len() != function.arity() {
+                    return Err(VisitorError::RuntimeError(
+                        paren.clone(),
+                        format!(
+                            "Expected {} args but got {}.",
+                            function.arity(),
+                            arguments.len()
+                        ),
+                    ));
+                }
+
+                let mut args = Vec::new();
+                for arg in arguments {
+                    self.execute(arg)?;
+                    args.push(self.output().unwrap());
+                }
+
+                let function_val = function.call(self, args)?;
+                self.execute(&function_val)?;
+            }
+
             Expr::Logical(left, operator, right) => {
                 // only evaluate left to possibly short circut
                 self.execute(left)?;
@@ -140,7 +175,10 @@ impl Visitor for Interpreter {
                 let lookup = self.environment.get(&token.lexeme);
 
                 match lookup {
-                    Ok(v) => self.stack.push(v.literal().clone()),
+                    Ok(v) => match v {
+                        Statement::Function(name, _, _) => self.stack.push(name.literal.clone()),
+                        _ => self.stack.push(v.expr().literal().clone()),
+                    },
                     Err(VisitorError::RuntimeError(_, msg)) => {
                         return Err(VisitorError::RuntimeError(token.clone(), msg))
                     }
@@ -181,6 +219,12 @@ impl Visitor for Interpreter {
                     self.execute(else_branch)?;
                 }
             }
+            Statement::Function(name, args, body) => {
+                self.environment.define(
+                    &name.lexeme,
+                    Statement::Function(name.clone(), args.clone(), body.clone()),
+                );
+            }
             Statement::Print(expr) => {
                 self.execute(expr)?;
                 let value = self.output().unwrap_or(TokenLiteral::None);
@@ -188,8 +232,8 @@ impl Visitor for Interpreter {
             }
             Statement::Var(token, expr) => {
                 self.execute(expr)?;
-                let val = Expr::Literal(self.output().unwrap_or(TokenLiteral::None));
-                self.environment.define(&token.lexeme, val);
+                let val: Expr = self.output().unwrap_or(TokenLiteral::None).into();
+                self.environment.define(&token.lexeme, val.into());
             }
             Statement::While(expr, stmt) => loop {
                 self.execute(expr)?;

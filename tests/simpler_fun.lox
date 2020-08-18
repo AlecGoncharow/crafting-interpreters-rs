@@ -1,0 +1,5 @@
+fun onetwothree() {
+   print "123";
+}
+
+onetwothree();
