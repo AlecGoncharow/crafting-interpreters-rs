@@ -12,27 +12,6 @@ use std::io;
 use std::io::{Error, ErrorKind};
 
 fn main() -> io::Result<()> {
-    /*
-    let expr = Expr::Binary(
-        Box::new(Expr::Unary(
-            Token::new(TokenType::MINUS, "-", TokenLiteral::None, 1),
-            Box::new(Expr::Literal(TokenLiteral::Number(123.))),
-        )),
-        Token::new(TokenType::STAR, "*", TokenLiteral::None, 1),
-        Box::new(Expr::Grouping(Box::new(Expr::Literal(
-            TokenLiteral::Number(45.67),
-        )))),
-    );
-
-    let printer = AstPrinter::new();
-    printer.print(&expr);
-    */
-    println!("{}", env!("CARGO_MANIFEST_DIR"));
-
-    for argument in env::args() {
-        println!("arg :: {}", argument);
-    }
-
     let args = env::args();
     match args.len() {
         1 => lox::run_prompt(),
@@ -92,6 +71,8 @@ mod test {
     test_ok!(equals);
     test_ok!(break_loop);
     test_ok!(continue_loop);
+    test_ok!(simple_fun);
+    test_ok!(simpler_fun);
 
     test_err!(var_err);
     test_err!(mismatch_err);

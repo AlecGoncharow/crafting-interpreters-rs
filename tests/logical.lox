@@ -1,2 +1,19 @@
 print "hi" or 2; // "hi".
 print nil or "yes"; // "yes".
+print true and nil;
+print 1 and true;
+
+if (1 and 2 and 3 and 4) { 
+	print "numbers are truthy";
+}
+
+if (nil and 1 or true) {
+	print "or is strong";
+}
+
+if (nil and true) {
+	print "no";
+} else {
+	print "yes";
+}
+
