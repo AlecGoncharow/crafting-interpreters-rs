@@ -114,7 +114,7 @@ impl Parser {
         )?;
         let body = self.block()?;
 
-        Ok(Statement::Function(name, paramaters, body))
+        Ok(Statement::Function(name, paramaters, body, None))
     }
 
     fn statement(&mut self) -> StatementResult {
@@ -128,9 +128,21 @@ impl Parser {
             self.while_statement()
         } else if self.match_rule(TokenType::FOR) {
             self.for_statement()
+        } else if self.match_rule(TokenType::RETURN) {
+            self.return_statement()
         } else {
             self.expression_statement()
         }
+    }
+
+    fn return_statement(&mut self) -> StatementResult {
+        let keyword = self.previous().clone();
+        let mut value = Expr::none();
+        if !self.check(TokenType::SEMICOLON) {
+            value = self.expression()?;
+        }
+        self.consume(TokenType::SEMICOLON, "Expect ';' after return value.")?;
+        Ok(Statement::Return(keyword, value))
     }
 
     fn print_statement(&mut self) -> StatementResult {

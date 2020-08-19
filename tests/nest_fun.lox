@@ -1,0 +1,11 @@
+fun make_fun() {
+	fun real_fun() {
+		print "real fun";
+	}
+
+	return real_fun;
+}
+
+var fn = make_fun();
+print fn;
+fn();

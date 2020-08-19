@@ -20,6 +20,7 @@ impl Visitor for Interpreter {
             Expr::Assign(token, expr) => {
                 self.execute(expr)?;
                 let val: Expr = self.output().unwrap_or(TokenLiteral::None).into();
+                println!("assign {:?}", val);
                 self.environment.assign(&token.lexeme, val.into())?;
             }
             Expr::Binary(left, operator, right) => {
@@ -108,16 +109,22 @@ impl Visitor for Interpreter {
             Expr::Call(callee, paren, arguments) => {
                 self.execute(callee)?;
                 let callee_name = self.output().unwrap();
+                println!("call {:?}", callee_name);
                 let mut function = self.environment.get(&callee_name.to_string())?.clone();
-                match function {
-                    Statement::Function(..) => (),
+                function = match function {
+                    Statement::Function(name, params, body, closure) => {
+                        let mut closure = closure.unwrap();
+                        closure.enclosing = Some(self.environment.clone().into());
+                        Statement::Function(name, params, body, Some(closure))
+                    }
                     _ => {
+                        println!("{:?}", function);
                         return Err(VisitorError::RuntimeError(
                             paren.clone(),
                             "Can only call functions and classes.".into(),
-                        ))
+                        ));
                     }
-                }
+                };
 
                 if arguments.len() != function.arity() {
                     return Err(VisitorError::RuntimeError(
@@ -176,7 +183,17 @@ impl Visitor for Interpreter {
 
                 match lookup {
                     Ok(v) => match v {
-                        Statement::Function(name, _, _) => self.stack.push(name.literal.clone()),
+                        Statement::Function(name, _, _, _) => self.stack.push(name.literal.clone()),
+                        Statement::Expr(expr) => match expr {
+                            Expr::Literal(literal) => match literal {
+                                TokenLiteral::Identifier(_) => {
+                                    // likely a function pointer, use token name
+                                    self.stack.push(token.literal.clone());
+                                }
+                                _ => self.stack.push(literal.clone()),
+                            },
+                            _ => self.stack.push(expr.literal().clone()),
+                        },
                         _ => self.stack.push(v.expr().literal().clone()),
                     },
                     Err(VisitorError::RuntimeError(_, msg)) => {
@@ -219,10 +236,17 @@ impl Visitor for Interpreter {
                     self.execute(else_branch)?;
                 }
             }
-            Statement::Function(name, args, body) => {
+            Statement::Function(name, args, body, _env) => {
+                self.execute_block(body)?;
+                // println!("fun: {:?}, {:#?}", name, self.environment);
                 self.environment.define(
                     &name.lexeme,
-                    Statement::Function(name.clone(), args.clone(), body.clone()),
+                    Statement::Function(
+                        name.clone(),
+                        args.clone(),
+                        body.clone(),
+                        Some(Environment::new_enclosed(self.environment.clone())),
+                    ),
                 );
             }
             Statement::Print(expr) => {
@@ -243,16 +267,21 @@ impl Visitor for Interpreter {
                     break;
                 }
                 self.execute(stmt)?;
-                match self.peek() {
-                    Some(token) => match token {
+                if let Some(token) = self.peek() {
+                    match token {
                         TokenLiteral::Break => break,
+                        TokenLiteral::Return(_value) => break,
                         _ => (),
-                    },
-                    None => (),
+                    }
                 }
             },
             Statement::Block(stmts) => {
                 self.execute_block(stmts)?;
+            }
+            Statement::Return(_keyword, value) => {
+                self.execute(value)?;
+                let output = self.output().unwrap().clone();
+                self.stack.push(TokenLiteral::Return(Box::new(output)));
             }
         }
         Ok(())
@@ -313,6 +342,17 @@ impl Interpreter {
             match self.peek() {
                 Some(token) => match token {
                     TokenLiteral::Break => break,
+                    TokenLiteral::Return(value) => {
+                        if let TokenLiteral::Identifier(ident) = *value.clone() {
+                            let hoist_val = self.environment.get(&ident)?.clone();
+                            self.environment
+                                .enclosing
+                                .unwrap()
+                                .define(&ident, hoist_val);
+                        }
+
+                        break;
+                    }
                     TokenLiteral::Continue => {
                         // need to do increment in for loop if continue'd, check if last stmt is ForIncr
                         match stmts.last().unwrap() {
@@ -337,7 +377,7 @@ impl Interpreter {
         self.stack.pop()
     }
 
-    pub fn peek(&mut self) -> Option<&TokenLiteral> {
+    pub fn peek(&self) -> Option<&TokenLiteral> {
         self.stack.last()
     }
 }

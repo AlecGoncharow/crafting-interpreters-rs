@@ -4,10 +4,10 @@ use crate::ast::VisitorError;
 use crate::token::{Token, TokenLiteral, TokenType};
 use std::collections::HashMap;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Environment {
     values: HashMap<String, Statement>,
-    enclosing: Option<Box<Environment>>,
+    pub enclosing: Option<Box<Environment>>,
 }
 
 impl Environment {
@@ -61,7 +61,7 @@ impl Environment {
     }
 
     pub fn get(&self, name: &str) -> Result<&Statement, VisitorError> {
-        return match self.values.get(name) {
+        match self.values.get(name) {
             Some(stmt) => match stmt {
                 Statement::Expr(expr) => match expr {
                     Expr::Literal(TokenLiteral::Uninit) => Err(VisitorError::RuntimeError(
@@ -75,21 +75,21 @@ impl Environment {
             None => {
                 // try enclosing
                 if let Some(inner) = &self.enclosing {
-                    return match inner.get(name) {
+                    match inner.get(name) {
                         Ok(stmt) => match stmt {
                             Statement::Expr(expr) => match expr {
                                 Expr::Literal(TokenLiteral::Uninit) => {
-                                    Err(VisitorError::RuntimeError(
+                                    return Err(VisitorError::RuntimeError(
                                         Token::none(),
                                         "Variable used before initialization".into(),
                                     ))
                                 }
-                                _ => Ok(stmt),
+                                _ => return Ok(stmt),
                             },
-                            _ => Ok(stmt),
+                            _ => return Ok(stmt),
                         },
-                        Err(e) => Err(e),
-                    };
+                        Err(e) => return Err(e),
+                    }
                 }
 
                 Err(VisitorError::RuntimeError(
@@ -102,6 +102,6 @@ impl Environment {
                     "Undefined variable.".into(),
                 ))
             }
-        };
+        }
     }
 }

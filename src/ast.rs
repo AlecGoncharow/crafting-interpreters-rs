@@ -30,12 +30,13 @@ pub trait Visitor {
         match stmt {
             Statement::Expr(expr) => self.visit_expr(expr)?,
             Statement::ForIncr(expr) => self.visit_expr(expr)?,
-            Statement::Function(name, args, body) => {}
+            Statement::Function(name, args, body, closure) => {}
             Statement::If(cond, then_branch, else_branch) => {}
             Statement::Print(expr) => {}
             Statement::Var(token, expr) => {}
             Statement::While(expr, stmt) => {}
             Statement::Block(stmts) => {}
+            Statement::Return(name, value) => {}
         }
 
         Ok(())
@@ -81,12 +82,13 @@ impl From<Expr> for Statement {
 pub enum Statement {
     Expr(Expr),
     ForIncr(Expr),
-    Function(Token, Vec<Token>, Vec<Statement>),
+    Function(Token, Vec<Token>, Vec<Statement>, Option<Environment>),
     If(Expr, Box<Statement>, Box<Statement>),
     Print(Expr),
     Var(Token, Expr),
     While(Expr, Box<Statement>),
     Block(Vec<Statement>),
+    Return(Token, Expr),
 }
 
 impl Statement {
@@ -101,7 +103,7 @@ impl Statement {
 
     pub fn arity(&self) -> usize {
         match self {
-            Self::Function(_, args, _) => args.len(),
+            Self::Function(_, args, _, _) => args.len(),
             _ => 0,
         }
     }
@@ -112,8 +114,8 @@ impl Statement {
         args: Vec<TokenLiteral>,
     ) -> Result<Expr, VisitorError> {
         match self {
-            Self::Function(_name, params, body) => {
-                let mut environment = Environment::new_enclosed(interpreter.environment.clone());
+            Self::Function(_name, params, body, closure) => {
+                let mut environment = Environment::new_enclosed(closure.clone().unwrap());
 
                 for i in 0..params.len() {
                     environment.define(
@@ -124,8 +126,36 @@ impl Statement {
 
                 interpreter.environment = environment;
                 interpreter.execute_block(body)?;
-                interpreter.environment =
-                    *interpreter.environment.clone().into_enclosing().unwrap();
+
+                if let TokenLiteral::Return(val) =
+                    interpreter.output().unwrap_or(TokenLiteral::None).clone()
+                {
+                    // check if function needs to be hoisted
+                    println!("{:#?}", val);
+                    println!("{:#?}", interpreter.environment);
+                    if let TokenLiteral::Identifier(ident) = *val {
+                        let hoist_val = interpreter.environment.get(&ident)?.clone();
+                        interpreter.environment = *interpreter
+                            .environment
+                            .clone()
+                            .into_enclosing()
+                            .unwrap()
+                            .into_enclosing()
+                            .unwrap();
+                        interpreter.environment.define(&ident, hoist_val.clone());
+                        println!("{:#?}", interpreter.environment);
+                        return Ok(Expr::Literal(TokenLiteral::Identifier(ident)));
+                    } else {
+                        return Ok(Expr::Literal(*val));
+                    }
+                }
+                interpreter.environment = *interpreter
+                    .environment
+                    .clone()
+                    .into_enclosing()
+                    .unwrap()
+                    .into_enclosing()
+                    .unwrap();
             }
             _ => unimplemented!(),
         }
@@ -226,7 +256,7 @@ impl Visitor for AstPrinter {
                 self.visit_statement(else_branch)?;
                 self.buf.push(')');
             }
-            Statement::Function(name, args, body) => {
+            Statement::Function(name, args, body, _) => {
                 self.buf.push_str("(func_decl ");
                 self.buf.push_str(&name.lexeme);
                 self.buf.push(' ');
@@ -244,6 +274,9 @@ impl Visitor for AstPrinter {
             }
             Statement::Var(token, expr) => {
                 self.parenthesize("=", &[&Expr::Literal(token.literal.clone()), expr])?;
+            }
+            Statement::Return(_token, expr) => {
+                self.parenthesize("return", &[expr])?;
             }
             Statement::While(expr, stmt) => {
                 self.buf.push_str("(while ");
