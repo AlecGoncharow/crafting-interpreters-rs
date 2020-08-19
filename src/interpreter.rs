@@ -277,7 +277,7 @@ impl Visitor for Interpreter {
             }
             Statement::Return(_keyword, value) => {
                 self.execute(value)?;
-                let output = self.output().unwrap().clone();
+                let output = self.output().unwrap();
                 self.stack.push(TokenLiteral::Return(Box::new(output)));
             }
         }
@@ -336,23 +336,21 @@ impl Interpreter {
 
         for stmt in stmts {
             self.execute(stmt)?;
-            match self.peek() {
-                Some(token) => match token {
+            if let Some(token) = self.peek() {
+                match token {
                     TokenLiteral::Break => break,
                     TokenLiteral::Return(_value) => {
                         break;
                     }
                     TokenLiteral::Continue => {
                         // need to do increment in for loop if continue'd, check if last stmt is ForIncr
-                        match stmts.last().unwrap() {
-                            Statement::ForIncr(expr) => self.execute(expr)?,
-                            _ => (),
+                        if let Statement::ForIncr(expr) = stmts.last().unwrap() {
+                            self.execute(expr)?;
                         }
                         break;
                     }
                     _ => (),
-                },
-                None => (),
+                }
             }
         }
 

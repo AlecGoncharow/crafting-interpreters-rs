@@ -3,9 +3,10 @@ fun make_fun() {
 		print "real fun";
 	}
 
+	real_fun();
+
 	return real_fun;
 }
 
 var fn = make_fun();
 print fn;
-fn();

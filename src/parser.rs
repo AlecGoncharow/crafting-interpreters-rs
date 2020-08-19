@@ -96,7 +96,7 @@ impl Parser {
                 }
 
                 paramaters.push(
-                    self.consume(TokenType::IDENTIFIER, "Expect paramter name".into())?
+                    self.consume(TokenType::IDENTIFIER, "Expect paramter name")?
                         .clone(),
                 );
 
@@ -380,7 +380,7 @@ impl Parser {
         }
         let paren = self.consume(TokenType::RIGHT_PAREN, "Expect ')' after arguments.")?;
 
-        Ok(Expr::Call(callee.into(), paren.clone(), args.into()))
+        Ok(Expr::Call(callee.into(), paren.clone(), args))
     }
 
     fn primary(&mut self) -> ParseResult {

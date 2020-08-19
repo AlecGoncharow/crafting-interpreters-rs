@@ -130,8 +130,9 @@ impl Statement {
                     *interpreter.environment.clone().into_enclosing().unwrap();
 
                 if let TokenLiteral::Return(val) =
-                    interpreter.output().unwrap_or(TokenLiteral::None).clone()
+                    interpreter.output().unwrap_or(TokenLiteral::None)
                 {
+                    //@TODO store returned function pointer somehow...
                     return Ok(Expr::Literal(*val));
                 }
             }
