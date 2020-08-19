@@ -114,8 +114,8 @@ impl Statement {
         args: Vec<TokenLiteral>,
     ) -> Result<Expr, VisitorError> {
         match self {
-            Self::Function(_name, params, body, closure) => {
-                let mut environment = Environment::new_enclosed(closure.clone().unwrap());
+            Self::Function(_name, params, body, _closure) => {
+                let mut environment = Environment::new_enclosed(interpreter.environment.clone());
 
                 for i in 0..params.len() {
                     environment.define(
@@ -126,36 +126,14 @@ impl Statement {
 
                 interpreter.environment = environment;
                 interpreter.execute_block(body)?;
+                interpreter.environment =
+                    *interpreter.environment.clone().into_enclosing().unwrap();
 
                 if let TokenLiteral::Return(val) =
                     interpreter.output().unwrap_or(TokenLiteral::None).clone()
                 {
-                    // check if function needs to be hoisted
-                    println!("{:#?}", val);
-                    println!("{:#?}", interpreter.environment);
-                    if let TokenLiteral::Identifier(ident) = *val {
-                        let hoist_val = interpreter.environment.get(&ident)?.clone();
-                        interpreter.environment = *interpreter
-                            .environment
-                            .clone()
-                            .into_enclosing()
-                            .unwrap()
-                            .into_enclosing()
-                            .unwrap();
-                        interpreter.environment.define(&ident, hoist_val.clone());
-                        println!("{:#?}", interpreter.environment);
-                        return Ok(Expr::Literal(TokenLiteral::Identifier(ident)));
-                    } else {
-                        return Ok(Expr::Literal(*val));
-                    }
+                    return Ok(Expr::Literal(*val));
                 }
-                interpreter.environment = *interpreter
-                    .environment
-                    .clone()
-                    .into_enclosing()
-                    .unwrap()
-                    .into_enclosing()
-                    .unwrap();
             }
             _ => unimplemented!(),
         }

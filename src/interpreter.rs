@@ -20,7 +20,6 @@ impl Visitor for Interpreter {
             Expr::Assign(token, expr) => {
                 self.execute(expr)?;
                 let val: Expr = self.output().unwrap_or(TokenLiteral::None).into();
-                println!("assign {:?}", val);
                 self.environment.assign(&token.lexeme, val.into())?;
             }
             Expr::Binary(left, operator, right) => {
@@ -109,7 +108,6 @@ impl Visitor for Interpreter {
             Expr::Call(callee, paren, arguments) => {
                 self.execute(callee)?;
                 let callee_name = self.output().unwrap();
-                println!("call {:?}", callee_name);
                 let mut function = self.environment.get(&callee_name.to_string())?.clone();
                 function = match function {
                     Statement::Function(name, params, body, closure) => {
@@ -237,7 +235,6 @@ impl Visitor for Interpreter {
                 }
             }
             Statement::Function(name, args, body, _env) => {
-                self.execute_block(body)?;
                 // println!("fun: {:?}, {:#?}", name, self.environment);
                 self.environment.define(
                     &name.lexeme,
@@ -342,15 +339,7 @@ impl Interpreter {
             match self.peek() {
                 Some(token) => match token {
                     TokenLiteral::Break => break,
-                    TokenLiteral::Return(value) => {
-                        if let TokenLiteral::Identifier(ident) = *value.clone() {
-                            let hoist_val = self.environment.get(&ident)?.clone();
-                            self.environment
-                                .enclosing
-                                .unwrap()
-                                .define(&ident, hoist_val);
-                        }
-
+                    TokenLiteral::Return(_value) => {
                         break;
                     }
                     TokenLiteral::Continue => {

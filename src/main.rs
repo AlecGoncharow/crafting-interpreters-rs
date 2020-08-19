@@ -73,6 +73,7 @@ mod test {
     test_ok!(continue_loop);
     test_ok!(simple_fun);
     test_ok!(simpler_fun);
+    test_ok!(fib);
 
     test_err!(var_err);
     test_err!(mismatch_err);
