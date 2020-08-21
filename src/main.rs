@@ -1,4 +1,5 @@
 #![feature(or_patterns)]
+#![feature(nll)]
 
 mod ast;
 mod environment;

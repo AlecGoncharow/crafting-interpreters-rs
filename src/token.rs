@@ -3,7 +3,7 @@ use std::fmt;
 
 #[allow(non_camel_case_types, dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum TokenType {
+pub enum TokenKind {
     // Single-character tokens.
     LEFT_PAREN,
     RIGHT_PAREN,
@@ -69,6 +69,9 @@ pub enum TokenLiteral {
     Continue,
     Return(Box<TokenLiteral>),
 }
+
+#[derive(Debug, Clone)]
+pub struct Object;
 
 impl TokenLiteral {
     pub fn is_truthy(&self) -> bool {
@@ -159,7 +162,7 @@ impl Into<Option<String>> for TokenLiteral {
 
 #[derive(Debug, Clone)]
 pub struct Token {
-    pub token_type: TokenType,
+    pub kind: TokenKind,
     pub lexeme: String,
     //@TODO add literal somehow
     pub literal: TokenLiteral,
@@ -167,9 +170,9 @@ pub struct Token {
 }
 
 impl Token {
-    pub fn new(token_type: TokenType, lexeme: &str, literal: TokenLiteral, line: usize) -> Self {
+    pub fn new(token_type: TokenKind, lexeme: &str, literal: TokenLiteral, line: usize) -> Self {
         Self {
-            token_type,
+            kind: token_type,
             lexeme: lexeme.into(),
             literal,
             line,
@@ -178,7 +181,7 @@ impl Token {
 
     pub fn none() -> Self {
         Self {
-            token_type: TokenType::NIL,
+            kind: TokenKind::NIL,
             lexeme: "".into(),
             literal: TokenLiteral::None,
             line: 0,

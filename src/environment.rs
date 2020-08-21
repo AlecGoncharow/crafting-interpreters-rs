@@ -1,7 +1,7 @@
 use crate::ast::Expr;
 use crate::ast::Statement;
-use crate::ast::VisitorError;
-use crate::token::{Token, TokenLiteral, TokenType};
+use crate::interpreter::ExecutorError;
+use crate::token::{Token, TokenKind, TokenLiteral};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
@@ -33,7 +33,7 @@ impl Environment {
         self.values.insert(name.into(), val);
     }
 
-    pub fn assign(&mut self, name: &str, val: Statement) -> Result<(), VisitorError> {
+    pub fn assign(&mut self, name: &str, val: Statement) -> Result<(), ExecutorError> {
         match self.values.get(name) {
             Some(_) => {
                 self.values.insert(name.into(), val);
@@ -46,9 +46,9 @@ impl Environment {
                     self.enclosing = Some(take_inner);
                     Ok(())
                 } else {
-                    Err(VisitorError::RuntimeError(
+                    Err(ExecutorError::RuntimeError(
                         Token::new(
-                            TokenType::IDENTIFIER,
+                            TokenKind::IDENTIFIER,
                             name,
                             TokenLiteral::Identifier(name.into()),
                             0,
@@ -60,11 +60,11 @@ impl Environment {
         }
     }
 
-    pub fn get(&self, name: &str) -> Result<&Statement, VisitorError> {
+    pub fn get(&self, name: &str) -> Result<&Statement, ExecutorError> {
         match self.values.get(name) {
             Some(stmt) => match stmt {
                 Statement::Expr(expr) => match expr {
-                    Expr::Literal(TokenLiteral::Uninit) => Err(VisitorError::RuntimeError(
+                    Expr::Literal(TokenLiteral::Uninit) => Err(ExecutorError::RuntimeError(
                         Token::none(),
                         "Variable used before initialization".into(),
                     )),
@@ -79,7 +79,7 @@ impl Environment {
                         Ok(stmt) => match stmt {
                             Statement::Expr(expr) => match expr {
                                 Expr::Literal(TokenLiteral::Uninit) => {
-                                    return Err(VisitorError::RuntimeError(
+                                    return Err(ExecutorError::RuntimeError(
                                         Token::none(),
                                         "Variable used before initialization".into(),
                                     ))
@@ -92,9 +92,9 @@ impl Environment {
                     }
                 }
 
-                Err(VisitorError::RuntimeError(
+                Err(ExecutorError::RuntimeError(
                     Token::new(
-                        TokenType::IDENTIFIER,
+                        TokenKind::IDENTIFIER,
                         name,
                         TokenLiteral::Identifier(name.into()),
                         0,

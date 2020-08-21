@@ -1,12 +1,112 @@
-use crate::ast::Acceptor;
-use crate::ast::Visitor;
-use crate::ast::VisitorError;
-use crate::ast::VisitorResult;
-use crate::ast::{Expr, Statement};
+use crate::ast::{BinaryExpr, Expr, LogicalExpr, Statement, StatementBlock, UnaryExpr};
 use crate::environment::Environment;
 use crate::token::Token;
+use crate::token::TokenKind;
 use crate::token::TokenLiteral;
-use crate::token::TokenType;
+use std::fmt;
+
+#[derive(Debug, PartialEq)]
+pub enum Value {
+    Nil,
+    Bool(bool),
+    Number(f64),
+    Str(String),
+    Identifier(String),
+    Break,
+    Continue,
+    Return(Box<Value>),
+}
+
+impl Value {
+    pub fn number(&self) -> Option<f64> {
+        if let Self::Number(inner) = self {
+            Some(*inner)
+        } else {
+            None
+        }
+    }
+
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Self::Bool(b) => *b,
+            Self::Nil => false,
+            _ => true,
+        }
+    }
+}
+
+impl From<&str> for Value {
+    fn from(v: &str) -> Self {
+        Self::Str(v.into())
+    }
+}
+
+impl From<String> for Value {
+    fn from(v: String) -> Self {
+        Self::Str(v.into())
+    }
+}
+
+impl From<f64> for Value {
+    fn from(v: f64) -> Self {
+        Self::Number(v.into())
+    }
+}
+
+impl From<bool> for Value {
+    fn from(v: bool) -> Self {
+        Self::Bool(v.into())
+    }
+}
+
+impl From<TokenLiteral> for Value {
+    fn from(v: TokenLiteral) -> Self {
+        match v {
+            TokenLiteral::Identifier(s) => Self::Identifier(s),
+            TokenLiteral::Str(s) => Self::Str(s),
+            TokenLiteral::Number(n) => Self::Number(n),
+            TokenLiteral::Bool(b) => Self::Bool(b),
+            TokenLiteral::None => Self::Nil,
+            _ => unimplemented!(),
+        }
+    }
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Identifier(s) => write!(f, "{}", s),
+            Self::Str(s) => write!(f, "\"{}\"", s),
+            Self::Number(n) => {
+                let mut s = n.to_string();
+                if s.ends_with(".0") {
+                    s.truncate(s.len() - 2);
+                }
+
+                write!(f, "{}", s)
+            }
+            Self::Bool(b) => write!(f, "{}", b.to_string()),
+            Self::Nil => write!(f, "nil"),
+            Self::Break => write!(f, "break"),
+            Self::Continue => write!(f, "continue"),
+            Self::Return(..) => write!(f, "return"),
+        }
+    }
+}
+
+pub enum ExecutorError {
+    RuntimeError(Token, String),
+}
+
+pub type RuntimeResult = Result<Value, ExecutorError>;
+
+pub trait Executable {
+    fn execute(&self, environment: &mut Environment) -> RuntimeResult;
+}
+
+pub trait Interpretable {
+    fn interpret(&self, environment: &mut Environment) -> RuntimeResult;
+}
 
 pub struct Interpreter {
     // this might be awful
@@ -14,110 +114,28 @@ pub struct Interpreter {
     pub environment: Environment,
 }
 
-impl Visitor for Interpreter {
-    fn visit_expr(&mut self, expr: &Expr) -> VisitorResult {
-        match expr {
+impl Interpretable for Expr {
+    fn interpret(&self, environment: &mut Environment) -> RuntimeResult {
+        match self {
             Expr::Assign(token, expr) => {
-                self.execute(expr)?;
-                let val: Expr = self.output().unwrap_or(TokenLiteral::None).into();
-                self.environment.assign(&token.lexeme, val.into())?;
+                let val = expr.interpret(environment)?;
+                println!("assign | name: {:?} val: {:?}", token, val);
+                unimplemented!();
+                //environment.assign(&token.lexeme, val.into())?;
             }
-            Expr::Binary(left, operator, right) => {
-                self.execute(left)?;
-                let left = self.stack.pop().unwrap();
-                self.execute(right)?;
-                let right = self.stack.pop().unwrap();
-
-                match operator.token_type {
-                    TokenType::MINUS => {
-                        check_number_operands(operator, &left, &right)?;
-                        self.stack.push(TokenLiteral::Number(
-                            left.number().unwrap() - right.number().unwrap(),
-                        ));
-                    }
-
-                    TokenType::SLASH => {
-                        check_number_operands(operator, &left, &right)?;
-                        self.stack.push(TokenLiteral::Number(
-                            left.number().unwrap() / right.number().unwrap(),
-                        ));
-                    }
-
-                    TokenType::STAR => {
-                        check_number_operands(operator, &left, &right)?;
-                        self.stack.push(TokenLiteral::Number(
-                            left.number().unwrap() * right.number().unwrap(),
-                        ));
-                    }
-
-                    TokenType::PLUS => {
-                        if let TokenLiteral::Str(mut left_s) = left {
-                            if let TokenLiteral::Str(right_s) = right {
-                                left_s.push_str(&right_s);
-                                self.stack.push(TokenLiteral::Str(left_s));
-                                return Ok(());
-                            }
-                        } else if let TokenLiteral::Number(left_n) = left {
-                            if let TokenLiteral::Number(right_n) = right {
-                                self.stack.push(TokenLiteral::Number(left_n + right_n));
-                                return Ok(());
-                            }
-                        }
-                        return Err(VisitorError::RuntimeError(
-                            operator.clone(),
-                            "Operands must be two numbers or two strings.".into(),
-                        ));
-                    }
-
-                    TokenType::GREATER => {
-                        check_number_operands(operator, &left, &right)?;
-                        self.stack.push(TokenLiteral::Bool(
-                            left.number().unwrap() > right.number().unwrap(),
-                        ));
-                    }
-
-                    TokenType::GREATER_EQUAL => {
-                        check_number_operands(operator, &left, &right)?;
-                        self.stack.push(TokenLiteral::Bool(
-                            left.number().unwrap() >= right.number().unwrap(),
-                        ));
-                    }
-
-                    TokenType::LESS => {
-                        check_number_operands(operator, &left, &right)?;
-                        self.stack.push(TokenLiteral::Bool(
-                            left.number().unwrap() < right.number().unwrap(),
-                        ));
-                    }
-
-                    TokenType::LESS_EQUAL => {
-                        check_number_operands(operator, &left, &right)?;
-                        self.stack.push(TokenLiteral::Bool(
-                            left.number().unwrap() <= right.number().unwrap(),
-                        ));
-                    }
-
-                    TokenType::EQUAL_EQUAL => {
-                        self.stack.push(TokenLiteral::Bool(left == right));
-                    }
-
-                    _ => unreachable!(),
-                }
-            }
+            Expr::Binary(inner) => return inner.interpret(environment),
+            Expr::Unary(inner) => return inner.interpret(environment),
 
             Expr::Call(callee, paren, arguments) => {
-                self.execute(callee)?;
-                let callee_name = self.output().unwrap();
-                let mut function = self.environment.get(&callee_name.to_string())?.clone();
+                let callee_name = callee.interpret(environment)?;
+                let mut function = environment.get(&callee_name.to_string())?.clone();
                 function = match function {
                     Statement::Function(name, params, body, closure) => {
-                        let mut closure = closure.unwrap();
-                        closure.enclosing = Some(self.environment.clone().into());
-                        Statement::Function(name, params, body, Some(closure))
+                        Statement::Function(name, params, body, closure)
                     }
                     _ => {
                         println!("{:?}", function);
-                        return Err(VisitorError::RuntimeError(
+                        return Err(ExecutorError::RuntimeError(
                             paren.clone(),
                             "Can only call functions and classes.".into(),
                         ));
@@ -125,7 +143,7 @@ impl Visitor for Interpreter {
                 };
 
                 if arguments.len() != function.arity() {
-                    return Err(VisitorError::RuntimeError(
+                    return Err(ExecutorError::RuntimeError(
                         paren.clone(),
                         format!(
                             "Expected {} args but got {}.",
@@ -137,159 +155,223 @@ impl Visitor for Interpreter {
 
                 let mut args = Vec::new();
                 for arg in arguments {
-                    self.execute(arg)?;
-                    args.push(self.output().unwrap());
+                    args.push(arg.interpret(environment)?);
                 }
 
-                let function_val = function.call(self, args)?;
-                self.execute(&function_val)?;
+                //let function_val = function.call(self, args)?;
+                //function_val.execute(environment)?;
             }
 
-            Expr::Logical(left, operator, right) => {
-                // only evaluate left to possibly short circut
-                self.execute(left)?;
-                let left = self.stack.pop().unwrap();
+            Expr::Logical(inner) => return inner.interpret(environment),
 
-                match operator.token_type {
-                    TokenType::OR => {
-                        if left.is_truthy() {
-                            self.stack.push(left);
-                            return Ok(());
-                        }
-                    }
-
-                    TokenType::AND => {
-                        if !left.is_truthy() {
-                            self.stack.push(left);
-                            return Ok(());
-                        }
-                    }
-
-                    _ => unreachable!(),
-                }
-
-                // couldn't short circut, eval right
-                self.execute(right)?;
-            }
-
-            Expr::Grouping(expression) => self.execute(expression)?,
-            Expr::Literal(literal) => {
-                self.stack.push(literal.clone());
-            }
+            Expr::Grouping(expression) => return expression.interpret(environment),
+            Expr::Literal(literal) => return Ok(literal.clone().into()),
             Expr::Variable(token) => {
-                let lookup = self.environment.get(&token.lexeme);
+                let lookup = environment.get(&token.lexeme);
 
-                match lookup {
-                    Ok(v) => match v {
-                        Statement::Function(name, _, _, _) => self.stack.push(name.literal.clone()),
-                        Statement::Expr(expr) => match expr {
-                            Expr::Literal(literal) => match literal {
-                                TokenLiteral::Identifier(_) => {
-                                    // likely a function pointer, use token name
-                                    self.stack.push(token.literal.clone());
-                                }
-                                _ => self.stack.push(literal.clone()),
-                            },
-                            _ => self.stack.push(expr.literal().clone()),
-                        },
-                        _ => self.stack.push(v.expr().literal().clone()),
-                    },
-                    Err(VisitorError::RuntimeError(_, msg)) => {
-                        return Err(VisitorError::RuntimeError(token.clone(), msg))
-                    }
-                }
-            }
-            Expr::Unary(operator, expr) => {
-                self.execute(expr)?;
-                let right = self.stack.pop().unwrap();
-
-                match operator.token_type {
-                    TokenType::MINUS => {
-                        check_number_operand(operator, &right)?;
-                        let val = -right.number().unwrap();
-                        self.stack.push(TokenLiteral::Number(val));
-                    }
-                    TokenType::BANG => {
-                        self.stack.push(TokenLiteral::Bool(!right.is_truthy()));
-                    }
-
-                    _ => unreachable!(),
-                }
+                unimplemented!();
             }
         }
 
-        Ok(())
-    }
-
-    fn visit_statement(&mut self, stmt: &Statement) -> VisitorResult {
-        match stmt {
-            Statement::Expr(expr) | Statement::ForIncr(expr) => self.visit_expr(expr)?,
-            Statement::If(cond, then_branch, else_branch) => {
-                self.execute(cond)?;
-                let out = self.output().unwrap();
-
-                if out.is_truthy() {
-                    self.execute(then_branch)?;
-                } else {
-                    self.execute(else_branch)?;
-                }
-            }
-            Statement::Function(name, args, body, _env) => {
-                // println!("fun: {:?}, {:#?}", name, self.environment);
-                self.environment.define(
-                    &name.lexeme,
-                    Statement::Function(
-                        name.clone(),
-                        args.clone(),
-                        body.clone(),
-                        Some(Environment::new_enclosed(self.environment.clone())),
-                    ),
-                );
-            }
-            Statement::Print(expr) => {
-                self.execute(expr)?;
-                let value = self.output().unwrap_or(TokenLiteral::None);
-                println!("{}", value);
-            }
-            Statement::Var(token, expr) => {
-                self.execute(expr)?;
-                let val: Expr = self.output().unwrap_or(TokenLiteral::None).into();
-                self.environment.define(&token.lexeme, val.into());
-            }
-            Statement::While(expr, stmt) => loop {
-                self.execute(expr)?;
-                let out = self.output().unwrap();
-
-                if !out.is_truthy() {
-                    break;
-                }
-                self.execute(stmt)?;
-                if let Some(token) = self.peek() {
-                    match token {
-                        TokenLiteral::Break => break,
-                        TokenLiteral::Return(_value) => break,
-                        _ => (),
-                    }
-                }
-            },
-            Statement::Block(stmts) => {
-                self.execute_block(stmts)?;
-            }
-            Statement::Return(_keyword, value) => {
-                self.execute(value)?;
-                let output = self.output().unwrap();
-                self.stack.push(TokenLiteral::Return(Box::new(output)));
-            }
-        }
-        Ok(())
+        Ok(Value::Nil)
     }
 }
 
-fn check_number_operand(operator: &Token, operand: &TokenLiteral) -> VisitorResult {
+impl Interpretable for BinaryExpr {
+    fn interpret(&self, environment: &mut Environment) -> RuntimeResult {
+        let left = self.left.interpret(environment)?;
+        let right = self.right.interpret(environment)?;
+
+        Ok(match self.operator.kind {
+            TokenKind::MINUS => {
+                check_number_operands(&self.operator, &left, &right)?;
+                (left.number().unwrap() - right.number().unwrap()).into()
+            }
+
+            TokenKind::SLASH => {
+                check_number_operands(&self.operator, &left, &right)?;
+                (left.number().unwrap() / right.number().unwrap()).into()
+            }
+
+            TokenKind::STAR => {
+                check_number_operands(&self.operator, &left, &right)?;
+                (left.number().unwrap() * right.number().unwrap()).into()
+            }
+
+            TokenKind::PLUS => {
+                if let Value::Str(mut left_s) = left {
+                    if let Value::Str(right_s) = right {
+                        left_s.push_str(&right_s);
+                        return Ok(left_s.into());
+                    }
+                } else if let Value::Number(left_n) = left {
+                    if let Value::Number(right_n) = right {
+                        return Ok((left_n + right_n).into());
+                    }
+                }
+                return Err(ExecutorError::RuntimeError(
+                    self.operator.clone(),
+                    "Operands must be two numbers or two strings.".into(),
+                ));
+            }
+
+            TokenKind::GREATER => {
+                check_number_operands(&self.operator, &left, &right)?;
+                (left.number().unwrap() > right.number().unwrap()).into()
+            }
+
+            TokenKind::GREATER_EQUAL => {
+                check_number_operands(&self.operator, &left, &right)?;
+                (left.number().unwrap() >= right.number().unwrap()).into()
+            }
+
+            TokenKind::LESS => {
+                check_number_operands(&self.operator, &left, &right)?;
+                (left.number().unwrap() < right.number().unwrap()).into()
+            }
+
+            TokenKind::LESS_EQUAL => {
+                check_number_operands(&self.operator, &left, &right)?;
+                (left.number().unwrap() <= right.number().unwrap()).into()
+            }
+
+            TokenKind::EQUAL_EQUAL => (left == right).into(),
+
+            _ => unreachable!(),
+        })
+    }
+}
+
+impl Interpretable for UnaryExpr {
+    fn interpret(&self, environment: &mut Environment) -> RuntimeResult {
+        let right = self.expr.interpret(environment)?;
+        Ok(match self.operator.kind {
+            TokenKind::MINUS => {
+                check_number_operand(&self.operator, &right)?;
+                let val = -right.number().unwrap();
+                val.into()
+            }
+            TokenKind::BANG => (!right.is_truthy()).into(),
+            _ => unreachable!(),
+        })
+    }
+}
+
+impl Interpretable for LogicalExpr {
+    fn interpret(&self, environment: &mut Environment) -> RuntimeResult {
+        // only evaluate left to possibly short circut
+        let left = self.left.interpret(environment)?;
+        match self.operator.kind {
+            TokenKind::OR => {
+                if left.is_truthy() {
+                    return Ok(left.into());
+                }
+            }
+
+            TokenKind::AND => {
+                if !left.is_truthy() {
+                    return Ok(left.into());
+                }
+            }
+
+            _ => unreachable!(),
+        }
+
+        // couldn't short circut, eval right
+        self.right.interpret(environment)
+    }
+}
+
+impl Executable for Statement {
+    fn execute(&self, environment: &mut Environment) -> RuntimeResult {
+        match self {
+            Statement::Expr(expr) | Statement::ForIncr(expr) => expr.interpret(environment),
+            Statement::If(cond, then_branch, else_branch) => {
+                let out = cond.interpret(environment)?;
+
+                if out.is_truthy() {
+                    then_branch.execute(environment)
+                } else {
+                    else_branch.execute(environment)
+                }
+            }
+            Statement::Function(name, args, body, env) => {
+                let env = if env.is_some() {
+                    println!("{:#?}", env);
+                    env.clone()
+                } else {
+                    Some(Environment::new_enclosed(environment.clone()))
+                };
+
+                environment.define(
+                    &name.lexeme,
+                    Statement::Function(name.clone(), args.clone(), body.clone(), env),
+                );
+                Ok(Value::Nil)
+            }
+            Statement::Print(expr) => {
+                let value = expr.interpret(environment)?;
+                println!("{}", value);
+                Ok(Value::Nil)
+            }
+            Statement::Var(token, expr) => {
+                let val = expr.interpret(environment)?;
+                unimplemented!();
+                //environment.define(&token.lexeme, val.into());
+                Ok(Value::Nil)
+            }
+            Statement::While(expr, stmt) => loop {
+                let out = expr.interpret(environment)?;
+
+                if !out.is_truthy() {
+                    return Ok(Value::Nil);
+                }
+                match stmt.execute(environment)? {
+                    Value::Break => return Ok(Value::Nil),
+                    Value::Return(_value) => unimplemented!(),
+                    _ => (),
+                }
+            },
+            Statement::Block(block) => unimplemented!(), //block.execute(environment),
+            Statement::Return(_keyword, value) => value.interpret(environment),
+        }
+    }
+}
+
+impl Executable for StatementBlock {
+    fn execute(&self, environment: &mut Environment) -> RuntimeResult {
+        // make inner env our new env
+        *environment = Environment::new_enclosed(environment.clone());
+
+        for stmt in &self.statements {
+            match stmt.execute(environment)? {
+                Value::Break => break,
+                Value::Return(_value) => {
+                    break;
+                }
+                Value::Continue => {
+                    // need to do increment in for loop if continue'd, check if last stmt is ForIncr
+                    if let Statement::ForIncr(expr) = self.statements.last().unwrap() {
+                        expr.interpret(environment)?;
+                    }
+                    break;
+                }
+                _ => (),
+            }
+        }
+
+        // return out env to main env
+        *environment = *environment.clone().into_enclosing().unwrap();
+
+        Ok(Value::Nil)
+    }
+}
+
+fn check_number_operand(operator: &Token, operand: &Value) -> Result<(), ExecutorError> {
     if operand.number().is_some() {
         Ok(())
     } else {
-        Err(VisitorError::RuntimeError(
+        Err(ExecutorError::RuntimeError(
             operator.clone(),
             "Operand must be a number.".into(),
         ))
@@ -298,13 +380,13 @@ fn check_number_operand(operator: &Token, operand: &TokenLiteral) -> VisitorResu
 
 fn check_number_operands(
     operator: &Token,
-    left: &TokenLiteral,
-    right: &TokenLiteral,
-) -> VisitorResult {
+    left: &Value,
+    right: &Value,
+) -> Result<(), ExecutorError> {
     if left.number().is_some() && right.number().is_some() {
         Ok(())
     } else {
-        Err(VisitorError::RuntimeError(
+        Err(ExecutorError::RuntimeError(
             operator.clone(),
             "Operand must be a numbers.".into(),
         ))
@@ -319,52 +401,10 @@ impl Interpreter {
         }
     }
 
-    pub fn interpret(&mut self, stmts: &[Statement]) -> VisitorResult {
+    pub fn interpret(&mut self, stmts: &[Statement]) -> RuntimeResult {
         for stmt in stmts {
-            self.execute(stmt)?;
+            stmt.execute(&mut self.environment)?;
         }
-        Ok(())
-    }
-
-    pub fn execute(&mut self, visit: &dyn Acceptor) -> VisitorResult {
-        visit.accept(self)
-    }
-
-    pub fn execute_block(&mut self, stmts: &[Statement]) -> VisitorResult {
-        // make inner env our new env
-        self.environment = Environment::new_enclosed(self.environment.clone());
-
-        for stmt in stmts {
-            self.execute(stmt)?;
-            if let Some(token) = self.peek() {
-                match token {
-                    TokenLiteral::Break => break,
-                    TokenLiteral::Return(_value) => {
-                        break;
-                    }
-                    TokenLiteral::Continue => {
-                        // need to do increment in for loop if continue'd, check if last stmt is ForIncr
-                        if let Statement::ForIncr(expr) = stmts.last().unwrap() {
-                            self.execute(expr)?;
-                        }
-                        break;
-                    }
-                    _ => (),
-                }
-            }
-        }
-
-        // return out env to main env
-        self.environment = *self.environment.clone().into_enclosing().unwrap();
-
-        Ok(())
-    }
-
-    pub fn output(&mut self) -> Option<TokenLiteral> {
-        self.stack.pop()
-    }
-
-    pub fn peek(&self) -> Option<&TokenLiteral> {
-        self.stack.last()
+        Ok(Value::Nil)
     }
 }

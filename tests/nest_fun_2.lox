@@ -1,0 +1,12 @@
+
+fun add_three(a, b, c) {
+	fun add_two(a, b) {
+		return a + b;
+	}
+	
+	return add_two(a, b) + c;
+}
+
+
+add_three(1, 2, 3);
+
