@@ -4,8 +4,13 @@ use crate::token::Token;
 use crate::token::TokenKind;
 use crate::token::TokenLiteral;
 use std::fmt;
+#[allow(dead_code)]
+#[derive(Debug, PartialEq, Clone)]
+pub enum Callable {
+    Clock,
+}
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     Nil,
     Bool(bool),
@@ -14,6 +19,7 @@ pub enum Value {
     Identifier(String),
     Break,
     Continue,
+    Callable(Callable),
     Return(Box<Value>),
 }
 
@@ -67,6 +73,8 @@ impl From<TokenLiteral> for Value {
             TokenLiteral::Number(n) => Self::Number(n),
             TokenLiteral::Bool(b) => Self::Bool(b),
             TokenLiteral::None => Self::Nil,
+            TokenLiteral::Continue => Self::Continue,
+            TokenLiteral::Break => Self::Break,
             _ => unimplemented!(),
         }
     }
@@ -89,6 +97,7 @@ impl fmt::Display for Value {
             Self::Nil => write!(f, "nil"),
             Self::Break => write!(f, "break"),
             Self::Continue => write!(f, "continue"),
+            Self::Callable(..) => write!(f, "callable"),
             Self::Return(..) => write!(f, "return"),
         }
     }
@@ -120,8 +129,7 @@ impl Interpretable for Expr {
             Expr::Assign(token, expr) => {
                 let val = expr.interpret(environment)?;
                 println!("assign | name: {:?} val: {:?}", token, val);
-                unimplemented!();
-                //environment.assign(&token.lexeme, val.into())?;
+                environment.assign(&token.lexeme, val.into())?;
             }
             Expr::Binary(inner) => return inner.interpret(environment),
             Expr::Unary(inner) => return inner.interpret(environment),
@@ -129,10 +137,8 @@ impl Interpretable for Expr {
             Expr::Call(callee, paren, arguments) => {
                 let callee_name = callee.interpret(environment)?;
                 let mut function = environment.get(&callee_name.to_string())?.clone();
-                function = match function {
-                    Statement::Function(name, params, body, closure) => {
-                        Statement::Function(name, params, body, closure)
-                    }
+                match function {
+                    Value::Callable(_) => (),
                     _ => {
                         println!("{:?}", function);
                         return Err(ExecutorError::RuntimeError(
@@ -142,6 +148,8 @@ impl Interpretable for Expr {
                     }
                 };
 
+                unimplemented!();
+                /*
                 if arguments.len() != function.arity() {
                     return Err(ExecutorError::RuntimeError(
                         paren.clone(),
@@ -158,6 +166,7 @@ impl Interpretable for Expr {
                     args.push(arg.interpret(environment)?);
                 }
 
+                */
                 //let function_val = function.call(self, args)?;
                 //function_val.execute(environment)?;
             }
@@ -167,12 +176,11 @@ impl Interpretable for Expr {
             Expr::Grouping(expression) => return expression.interpret(environment),
             Expr::Literal(literal) => return Ok(literal.clone().into()),
             Expr::Variable(token) => {
-                let lookup = environment.get(&token.lexeme);
+                let lookup = environment.get(&token.lexeme)?;
 
-                unimplemented!();
+                return Ok(lookup.clone());
             }
         }
-
         Ok(Value::Nil)
     }
 }
@@ -302,12 +310,15 @@ impl Executable for Statement {
                 } else {
                     Some(Environment::new_enclosed(environment.clone()))
                 };
+                unimplemented!();
 
+                /*
                 environment.define(
                     &name.lexeme,
                     Statement::Function(name.clone(), args.clone(), body.clone(), env),
                 );
-                Ok(Value::Nil)
+                */
+                //Ok(Value::Nil)
             }
             Statement::Print(expr) => {
                 let value = expr.interpret(environment)?;
@@ -316,8 +327,7 @@ impl Executable for Statement {
             }
             Statement::Var(token, expr) => {
                 let val = expr.interpret(environment)?;
-                unimplemented!();
-                //environment.define(&token.lexeme, val.into());
+                environment.define(&token.lexeme, val.into());
                 Ok(Value::Nil)
             }
             Statement::While(expr, stmt) => loop {
@@ -328,11 +338,11 @@ impl Executable for Statement {
                 }
                 match stmt.execute(environment)? {
                     Value::Break => return Ok(Value::Nil),
-                    Value::Return(_value) => unimplemented!(),
+                    Value::Return(value) => return Ok(*value),
                     _ => (),
                 }
             },
-            Statement::Block(block) => unimplemented!(), //block.execute(environment),
+            Statement::Block(block) => block.execute(environment),
             Statement::Return(_keyword, value) => value.interpret(environment),
         }
     }
@@ -346,8 +356,8 @@ impl Executable for StatementBlock {
         for stmt in &self.statements {
             match stmt.execute(environment)? {
                 Value::Break => break,
-                Value::Return(_value) => {
-                    break;
+                Value::Return(value) => {
+                    return Ok(Value::Return(value));
                 }
                 Value::Continue => {
                     // need to do increment in for loop if continue'd, check if last stmt is ForIncr

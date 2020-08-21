@@ -1,12 +1,11 @@
-use crate::ast::Expr;
-use crate::ast::Statement;
 use crate::interpreter::ExecutorError;
+use crate::interpreter::Value;
 use crate::token::{Token, TokenKind, TokenLiteral};
 use std::collections::HashMap;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Environment {
-    values: HashMap<String, Statement>,
+    values: HashMap<String, Value>,
     pub enclosing: Option<Box<Environment>>,
 }
 
@@ -29,11 +28,11 @@ impl Environment {
         self.enclosing
     }
 
-    pub fn define(&mut self, name: &str, val: Statement) {
+    pub fn define(&mut self, name: &str, val: Value) {
         self.values.insert(name.into(), val);
     }
 
-    pub fn assign(&mut self, name: &str, val: Statement) -> Result<(), ExecutorError> {
+    pub fn assign(&mut self, name: &str, val: Value) -> Result<(), ExecutorError> {
         match self.values.get(name) {
             Some(_) => {
                 self.values.insert(name.into(), val);
@@ -60,34 +59,19 @@ impl Environment {
         }
     }
 
-    pub fn get(&self, name: &str) -> Result<&Statement, ExecutorError> {
+    pub fn get(&self, name: &str) -> Result<&Value, ExecutorError> {
         match self.values.get(name) {
-            Some(stmt) => match stmt {
-                Statement::Expr(expr) => match expr {
-                    Expr::Literal(TokenLiteral::Uninit) => Err(ExecutorError::RuntimeError(
-                        Token::none(),
-                        "Variable used before initialization".into(),
-                    )),
-                    _ => Ok(stmt),
-                },
-                _ => Ok(stmt),
-            },
+            Some(val) => {
+                //@TODO uninitialzied vars should error
+                return Ok(val);
+            }
             None => {
                 // try enclosing
                 if let Some(inner) = &self.enclosing {
                     match inner.get(name) {
-                        Ok(stmt) => match stmt {
-                            Statement::Expr(expr) => match expr {
-                                Expr::Literal(TokenLiteral::Uninit) => {
-                                    return Err(ExecutorError::RuntimeError(
-                                        Token::none(),
-                                        "Variable used before initialization".into(),
-                                    ))
-                                }
-                                _ => return Ok(stmt),
-                            },
-                            _ => return Ok(stmt),
-                        },
+                        Ok(val) => {
+                            return Ok(val);
+                        }
                         Err(e) => return Err(e),
                     }
                 }

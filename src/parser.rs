@@ -121,7 +121,7 @@ impl Parser {
         if self.match_rule(TokenKind::PRINT) {
             self.print_statement()
         } else if self.match_rule(TokenKind::LEFT_BRACE) {
-            Ok(Statement::Block(self.block()?))
+            Ok(Statement::Block(self.block()?.into()))
         } else if self.match_rule(TokenKind::IF) {
             self.if_statment()
         } else if self.match_rule(TokenKind::WHILE) {
@@ -200,11 +200,11 @@ impl Parser {
         };
         self.consume(TokenKind::RIGHT_PAREN, "Expect ')' after for clauses.")?;
 
-        let body = Statement::Block(vec![self.statement()?, increment]);
+        let body = Statement::Block(vec![self.statement()?, increment].into());
 
         let for_loop = Statement::While(condition, body.into());
 
-        Ok(Statement::Block(vec![initializer, for_loop]))
+        Ok(Statement::Block(vec![initializer, for_loop].into()))
     }
 
     fn while_statement(&mut self) -> StatementResult {

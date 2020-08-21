@@ -2,7 +2,7 @@ use crate::environment::Environment;
 use crate::interpreter::ExecutorError;
 use crate::token::{Token, TokenLiteral};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Expr {
     Assign(Token, Box<Expr>),
     Binary(Box<BinaryExpr>),
@@ -14,7 +14,7 @@ pub enum Expr {
     Variable(Token),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct BinaryExpr {
     pub left: Expr,
     pub operator: Token,
@@ -41,7 +41,7 @@ impl From<(Expr, Token, Expr)> for Box<BinaryExpr> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct LogicalExpr {
     pub left: Expr,
     pub operator: Token,
@@ -68,7 +68,7 @@ impl From<(Expr, Token, Expr)> for Box<LogicalExpr> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct UnaryExpr {
     pub operator: Token,
     pub expr: Expr,
@@ -105,7 +105,7 @@ impl From<Expr> for Statement {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Statement {
     Expr(Expr),
     ForIncr(Expr),
@@ -114,12 +114,25 @@ pub enum Statement {
     Print(Expr),
     Var(Token, Expr),
     While(Expr, Box<Statement>),
-    Block(Vec<Statement>),
+    Block(Box<StatementBlock>),
     Return(Token, Expr),
 }
 
+#[derive(Clone, PartialEq, Debug)]
 pub struct StatementBlock {
     pub statements: Vec<Statement>,
+}
+
+impl From<Vec<Statement>> for StatementBlock {
+    fn from(statements: Vec<Statement>) -> Self {
+        Self { statements }
+    }
+}
+
+impl From<Vec<Statement>> for Box<StatementBlock> {
+    fn from(statements: Vec<Statement>) -> Self {
+        Box::new(StatementBlock { statements })
+    }
 }
 
 impl Statement {
@@ -241,8 +254,8 @@ impl AstPrinter {
             }
             Statement::Block(stmts) => {
                 self.buf.push_str("(block ");
-                for stmt in stmts {
-                    self.visit_statement(stmt)?;
+                for stmt in &stmts.statements {
+                    self.visit_statement(&stmt)?;
                 }
                 self.buf.push(')');
             }

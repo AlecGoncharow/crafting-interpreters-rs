@@ -70,9 +70,6 @@ pub enum TokenLiteral {
     Return(Box<TokenLiteral>),
 }
 
-#[derive(Debug, Clone)]
-pub struct Object;
-
 impl TokenLiteral {
     pub fn is_truthy(&self) -> bool {
         match self {
@@ -160,7 +157,7 @@ impl Into<Option<String>> for TokenLiteral {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Token {
     pub kind: TokenKind,
     pub lexeme: String,
