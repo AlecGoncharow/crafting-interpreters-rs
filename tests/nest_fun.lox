@@ -7,5 +7,4 @@ fun make_fun() {
 }
 
 var fn = make_fun();
-print fn;
 fn();

@@ -114,7 +114,7 @@ impl Parser {
         )?;
         let body = self.block()?;
 
-        Ok(Statement::Function(name, paramaters, body, None))
+        Ok(Statement::Function(name, paramaters, body.into(), None))
     }
 
     fn statement(&mut self) -> StatementResult {

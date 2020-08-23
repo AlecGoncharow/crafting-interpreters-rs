@@ -109,7 +109,7 @@ impl From<Expr> for Statement {
 pub enum Statement {
     Expr(Expr),
     ForIncr(Expr),
-    Function(Token, Vec<Token>, Vec<Statement>, Option<Environment>),
+    Function(Token, Vec<Token>, StatementBlock, Option<Environment>),
     If(Expr, Box<Statement>, Box<Statement>),
     Print(Expr),
     Var(Token, Expr),
@@ -231,7 +231,7 @@ impl AstPrinter {
                 args.iter()
                     .for_each(|arg| self.buf.push_str(&(arg.lexeme.clone() + " ")));
                 self.buf.push_str("(block ");
-                for stmt in body {
+                for stmt in &body.statements {
                     self.visit_statement(stmt)?;
                 }
                 self.buf.push(')');

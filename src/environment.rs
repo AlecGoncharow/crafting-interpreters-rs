@@ -1,12 +1,14 @@
 use crate::interpreter::ExecutorError;
 use crate::interpreter::Value;
 use crate::token::{Token, TokenKind, TokenLiteral};
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Environment {
     values: HashMap<String, Value>,
-    pub enclosing: Option<Box<Environment>>,
+    pub enclosing: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
@@ -17,15 +19,11 @@ impl Environment {
         }
     }
 
-    pub fn new_enclosed(enclosing: Environment) -> Self {
+    pub fn new_enclosed(enclosing: Rc<RefCell<Environment>>) -> Self {
         Self {
             values: HashMap::new(),
-            enclosing: Some(Box::new(enclosing)),
+            enclosing: Some(enclosing),
         }
-    }
-
-    pub fn into_enclosing(self) -> Option<Box<Self>> {
-        self.enclosing
     }
 
     pub fn define(&mut self, name: &str, val: Value) {
@@ -40,9 +38,7 @@ impl Environment {
             }
             None => {
                 if let Some(inner) = &self.enclosing {
-                    let mut take_inner = inner.clone();
-                    take_inner.assign(name, val)?;
-                    self.enclosing = Some(take_inner);
+                    inner.borrow_mut().assign(name, val)?;
                     Ok(())
                 } else {
                     Err(ExecutorError::RuntimeError(
@@ -59,18 +55,18 @@ impl Environment {
         }
     }
 
-    pub fn get(&self, name: &str) -> Result<&Value, ExecutorError> {
+    pub fn get(&self, name: &str) -> Result<Value, ExecutorError> {
         match self.values.get(name) {
             Some(val) => {
                 //@TODO uninitialzied vars should error
-                return Ok(val);
+                return Ok(val.clone());
             }
             None => {
                 // try enclosing
                 if let Some(inner) = &self.enclosing {
-                    match inner.get(name) {
+                    match inner.borrow().get(name) {
                         Ok(val) => {
-                            return Ok(val);
+                            return Ok(val.clone());
                         }
                         Err(e) => return Err(e),
                     }
