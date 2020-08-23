@@ -6,7 +6,7 @@ use crate::token::{Token, TokenLiteral};
 pub enum Expr {
     Assign(Token, Box<Expr>),
     Binary(Box<BinaryExpr>),
-    Call(Box<Expr>, Token, Vec<Expr>),
+    Call(Box<Expr>, Token, Vec<Statement>),
     Grouping(Box<Expr>),
     Literal(TokenLiteral),
     Unary(Box<UnaryExpr>),
@@ -197,7 +197,7 @@ impl AstPrinter {
                 self.visit_expr(callee)?;
                 for arg in arguments {
                     self.buf.push(' ');
-                    self.visit_expr(arg)?;
+                    self.visit_statement(arg)?;
                 }
                 self.buf.push(')');
             }

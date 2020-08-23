@@ -79,6 +79,7 @@ mod test {
     test_ok!(nest_fun_2);
     test_ok!(fun_closure);
     test_ok!(clock);
+    test_ok!(anon_fun);
 
     test_err!(var_err);
     test_err!(mismatch_err);

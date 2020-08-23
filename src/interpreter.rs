@@ -185,7 +185,7 @@ impl Interpretable for Expr {
 
                 let mut args = Vec::new();
                 for arg in arguments {
-                    args.push(arg.interpret(environment.clone())?);
+                    args.push(arg.execute(environment.clone())?);
                 }
 
                 function.call(environment, args)
@@ -329,11 +329,10 @@ impl Executable for Statement {
                 }
             }
             Statement::Function(name, args, body, _env) => {
-                environment.borrow_mut().define(
-                    &name.lexeme,
-                    Function::new_callable(args, body.clone(), environment.clone()).into(),
-                );
-                Ok(Value::Nil)
+                let func: Value =
+                    Function::new_callable(args, body.clone(), environment.clone()).into();
+                environment.borrow_mut().define(&name.lexeme, func.clone());
+                Ok(func)
             }
             Statement::Print(expr) => {
                 let value = expr.interpret(environment)?;

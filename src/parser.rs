@@ -66,7 +66,7 @@ impl Parser {
 
         let mut init = Expr::Literal(TokenLiteral::Uninit);
         if self.match_rule(TokenKind::EQUAL) {
-            init = self.expression()?;
+            init = self.expression()?.expr();
         }
 
         self.consume(
@@ -78,9 +78,13 @@ impl Parser {
     }
 
     fn function(&mut self, kind: &str) -> StatementResult {
-        let name = self
-            .consume(TokenKind::IDENTIFIER, &format!("Expect {} name.", kind))?
-            .clone();
+        let name = match self.consume(TokenKind::IDENTIFIER, &format!("Expect {} name.", kind)) {
+            Ok(token) => token.clone(),
+            Err(ParseError::Mismatch(token, _)) => {
+                Token::new(TokenKind::NIL, "", TokenLiteral::None, token.line)
+            }
+            _ => unreachable!(),
+        };
         self.consume(
             TokenKind::LEFT_PAREN,
             &format!("Expect '(' after {} name.", kind),
@@ -139,7 +143,7 @@ impl Parser {
         let keyword = self.previous().clone();
         let mut value = Expr::none();
         if !self.check(TokenKind::SEMICOLON) {
-            value = self.expression()?;
+            value = self.expression()?.expr();
         }
         self.consume(TokenKind::SEMICOLON, "Expect ';' after return value.")?;
         Ok(Statement::Return(keyword, value))
@@ -149,7 +153,7 @@ impl Parser {
         let expr = self.expression()?;
         self.consume(TokenKind::SEMICOLON, "Expect ';' after expression.")?;
 
-        Ok(Statement::Print(expr))
+        Ok(Statement::Print(expr.expr()))
     }
 
     fn if_statment(&mut self) -> StatementResult {
@@ -164,7 +168,7 @@ impl Parser {
         }
 
         Ok(Statement::If(
-            condition,
+            condition.expr(),
             then_branch.into(),
             else_branch.into(),
         ))
@@ -189,14 +193,14 @@ impl Parser {
         let condition = if self.check(TokenKind::SEMICOLON) {
             Expr::Literal(TokenLiteral::Bool(true))
         } else {
-            self.expression()?
+            self.expression()?.expr()
         };
         self.consume(TokenKind::SEMICOLON, "Expect ';' after loop condition")?;
 
         let increment = if self.check(TokenKind::RIGHT_PAREN) {
             Statement::Expr(Expr::none())
         } else {
-            Statement::ForIncr(self.expression()?)
+            Statement::ForIncr(self.expression()?.expr())
         };
         self.consume(TokenKind::RIGHT_PAREN, "Expect ')' after for clauses.")?;
 
@@ -213,7 +217,7 @@ impl Parser {
         self.consume(TokenKind::RIGHT_PAREN, "Expect ')' after condition.")?;
         let body = self.statement()?;
 
-        Ok(Statement::While(condition, body.into()))
+        Ok(Statement::While(condition.expr(), body.into()))
     }
 
     fn block(&mut self) -> StatementsResult {
@@ -231,22 +235,22 @@ impl Parser {
         let expr = self.expression()?;
         self.consume(TokenKind::SEMICOLON, "Expect ';' after expression.")?;
 
-        Ok(Statement::Expr(expr))
+        Ok(Statement::Expr(expr.expr()))
     }
 
-    fn expression(&mut self) -> ParseResult {
+    fn expression(&mut self) -> StatementResult {
         self.assignment()
     }
 
-    fn assignment(&mut self) -> ParseResult {
+    fn assignment(&mut self) -> StatementResult {
         let expr = self.or()?;
 
         if self.match_rule(TokenKind::EQUAL) {
             let equals = self.previous().clone();
             let value = self.assignment()?;
 
-            if let Expr::Variable(var) = expr {
-                Ok(Expr::Assign(var, value.into()))
+            if let Statement::Expr(Expr::Variable(var)) = expr {
+                Ok(Expr::Assign(var, value.expr().into()).into())
             } else {
                 Err(ParseError::Mismatch(
                     equals,
@@ -258,43 +262,43 @@ impl Parser {
         }
     }
 
-    fn or(&mut self) -> ParseResult {
+    fn or(&mut self) -> StatementResult {
         let mut expr = self.and()?;
 
         while self.match_rule(TokenKind::OR) {
             let operator = self.previous().clone();
             let right = self.and()?;
-            expr = Expr::Logical((expr, operator, right).into());
+            expr = Expr::Logical((expr.expr(), operator, right.expr()).into()).into();
         }
 
         Ok(expr)
     }
 
-    fn and(&mut self) -> ParseResult {
+    fn and(&mut self) -> StatementResult {
         let mut expr = self.equality()?;
 
         while self.match_rule(TokenKind::AND) {
             let operator = self.previous().clone();
             let right = self.equality()?;
-            expr = Expr::Logical((expr, operator, right).into());
+            expr = Expr::Logical((expr.expr(), operator, right.expr()).into()).into();
         }
 
         Ok(expr)
     }
 
-    fn equality(&mut self) -> ParseResult {
+    fn equality(&mut self) -> StatementResult {
         let mut expr = self.comparison()?;
 
         while self.match_rules(&[TokenKind::EQUAL_EQUAL, TokenKind::BANG_EQUAL]) {
             let operator = self.previous().clone();
             let right = self.comparison()?;
-            expr = Expr::Binary((expr, operator, right).into());
+            expr = Expr::Binary((expr.expr(), operator, right.expr()).into()).into();
         }
 
         Ok(expr)
     }
 
-    fn comparison(&mut self) -> ParseResult {
+    fn comparison(&mut self) -> StatementResult {
         let mut expr = self.addition()?;
 
         while self.match_rules(&[
@@ -305,52 +309,52 @@ impl Parser {
         ]) {
             let operator = self.previous().clone();
             let right = self.addition()?;
-            expr = Expr::Binary((expr, operator, right).into());
+            expr = Expr::Binary((expr.expr(), operator, right.expr()).into()).into();
         }
 
         Ok(expr)
     }
 
-    fn addition(&mut self) -> ParseResult {
+    fn addition(&mut self) -> StatementResult {
         let mut expr = self.multiplication()?;
 
         while self.match_rules(&[TokenKind::MINUS, TokenKind::PLUS]) {
             let operator = self.previous().clone();
             let right = self.multiplication()?;
-            expr = Expr::Binary((expr, operator, right).into());
+            expr = Expr::Binary((expr.expr(), operator, right.expr()).into()).into();
         }
 
         Ok(expr)
     }
 
-    fn multiplication(&mut self) -> ParseResult {
+    fn multiplication(&mut self) -> StatementResult {
         let mut expr = self.unary()?;
 
         while self.match_rules(&[TokenKind::SLASH, TokenKind::STAR]) {
             let operator = self.previous().clone();
             let right = self.unary()?;
-            expr = Expr::Binary((expr, operator, right).into());
+            expr = Expr::Binary((expr.expr(), operator, right.expr()).into()).into();
         }
 
         Ok(expr)
     }
 
-    fn unary(&mut self) -> ParseResult {
+    fn unary(&mut self) -> StatementResult {
         if self.match_rules(&[TokenKind::BANG, TokenKind::MINUS]) {
             let operator = self.previous().clone();
             let right = self.unary()?;
-            return Ok(Expr::Unary((operator, right).into()));
+            return Ok(Expr::Unary((operator, right.expr()).into()).into());
         }
 
         self.call()
     }
 
-    fn call(&mut self) -> ParseResult {
-        let mut expr = self.primary()?;
+    fn call(&mut self) -> StatementResult {
+        let mut expr: Statement = self.primary()?.into();
 
         loop {
             if self.match_rule(TokenKind::LEFT_PAREN) {
-                expr = self.finish_call(expr)?;
+                expr = self.finish_call(expr.expr())?;
             } else {
                 break;
             }
@@ -359,7 +363,7 @@ impl Parser {
         Ok(expr)
     }
 
-    fn finish_call(&mut self, callee: Expr) -> ParseResult {
+    fn finish_call(&mut self, callee: Expr) -> StatementResult {
         let mut args = Vec::new();
 
         if !self.check(TokenKind::RIGHT_PAREN) {
@@ -371,7 +375,11 @@ impl Parser {
                     ));
                 }
 
-                args.push(self.expression()?);
+                args.push(if self.match_rule(TokenKind::FUN) {
+                    self.function("function")?
+                } else {
+                    self.expression()?
+                });
 
                 if !self.match_rule(TokenKind::COMMA) {
                     break;
@@ -380,7 +388,7 @@ impl Parser {
         }
         let paren = self.consume(TokenKind::RIGHT_PAREN, "Expect ')' after arguments.")?;
 
-        Ok(Expr::Call(callee.into(), paren.clone(), args))
+        Ok(Expr::Call(callee.into(), paren.clone(), args).into())
     }
 
     fn primary(&mut self) -> ParseResult {
@@ -394,7 +402,7 @@ impl Parser {
             TokenKind::LEFT_PAREN => {
                 let expr = self.expression()?;
                 self.consume(TokenKind::RIGHT_PAREN, "Expect ')' after expression.")?;
-                Expr::Grouping(Box::new(expr))
+                Expr::Grouping(Box::new(expr.expr()))
             }
             TokenKind::IDENTIFIER => Expr::Variable(self.previous().clone()),
             _ => {
