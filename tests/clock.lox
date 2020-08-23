@@ -1,0 +1,8 @@
+var now = clock();
+
+print now;
+
+var now_two = clock();
+
+print now_two - now;
+

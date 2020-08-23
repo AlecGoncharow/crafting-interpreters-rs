@@ -8,5 +8,5 @@ fun add_three(a, b, c) {
 }
 
 
-add_three(1, 2, 3);
+print add_three(1, 2, 3);
 

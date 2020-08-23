@@ -75,6 +75,10 @@ mod test {
     test_ok!(simple_fun);
     test_ok!(simpler_fun);
     test_ok!(fib);
+    test_ok!(nest_fun);
+    test_ok!(nest_fun_2);
+    test_ok!(fun_closure);
+    test_ok!(clock);
 
     test_err!(var_err);
     test_err!(mismatch_err);

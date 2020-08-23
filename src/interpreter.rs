@@ -4,19 +4,77 @@ use crate::token::Token;
 use crate::token::TokenKind;
 use crate::token::TokenLiteral;
 use std::fmt;
-#[allow(dead_code)]
+use std::rc::Rc;
 #[derive(Debug, PartialEq, Clone)]
 pub enum Callable {
+    Function(Function),
     Clock,
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct Function {
+    pub params: Vec<Token>,
+    pub body: StatementBlock,
+    //pub closure: Environment,
+}
+
+impl Function {
+    pub fn new(params: &[Token], body: &[Statement]) -> Self {
+        Self {
+            params: params.into(),
+            body: Vec::from(body).into(),
+        }
+    }
+
+    pub fn new_callable(params: &[Token], body: &[Statement]) -> Callable {
+        Callable::Function(Self::new(params, body))
+    }
+}
+
+impl Callable {
+    pub fn call(&mut self, environment: &mut Environment, args: Vec<Value>) -> RuntimeResult {
+        match self {
+            Self::Clock => {
+                use std::time::SystemTime;
+
+                let now: Value = (SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .expect("time machine broke")
+                    .as_secs() as f64)
+                    .into();
+
+                println!("{:?}", now);
+                Ok(now)
+            }
+            Self::Function(function) => {
+                let mut environment = Environment::new_enclosed(environment.clone());
+
+                for i in 0..function.params.len() {
+                    environment.define(
+                        &function.params.get(i).unwrap().lexeme,
+                        args.get(i).unwrap().clone().into(),
+                    );
+                }
+
+                function.body.execute(&mut environment)
+            }
+        }
+    }
+
+    pub fn arity(&self) -> usize {
+        match self {
+            Self::Clock => 0,
+            Self::Function(function) => function.params.len(),
+        }
+    }
+}
+#[derive(Debug, PartialEq, Clone)]
 pub enum Value {
+    Uninit,
     Nil,
     Bool(bool),
     Number(f64),
     Str(String),
-    Identifier(String),
     Break,
     Continue,
     Callable(Callable),
@@ -41,49 +99,9 @@ impl Value {
     }
 }
 
-impl From<&str> for Value {
-    fn from(v: &str) -> Self {
-        Self::Str(v.into())
-    }
-}
-
-impl From<String> for Value {
-    fn from(v: String) -> Self {
-        Self::Str(v.into())
-    }
-}
-
-impl From<f64> for Value {
-    fn from(v: f64) -> Self {
-        Self::Number(v.into())
-    }
-}
-
-impl From<bool> for Value {
-    fn from(v: bool) -> Self {
-        Self::Bool(v.into())
-    }
-}
-
-impl From<TokenLiteral> for Value {
-    fn from(v: TokenLiteral) -> Self {
-        match v {
-            TokenLiteral::Identifier(s) => Self::Identifier(s),
-            TokenLiteral::Str(s) => Self::Str(s),
-            TokenLiteral::Number(n) => Self::Number(n),
-            TokenLiteral::Bool(b) => Self::Bool(b),
-            TokenLiteral::None => Self::Nil,
-            TokenLiteral::Continue => Self::Continue,
-            TokenLiteral::Break => Self::Break,
-            _ => unimplemented!(),
-        }
-    }
-}
-
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Identifier(s) => write!(f, "{}", s),
             Self::Str(s) => write!(f, "\"{}\"", s),
             Self::Number(n) => {
                 let mut s = n.to_string();
@@ -95,14 +113,16 @@ impl fmt::Display for Value {
             }
             Self::Bool(b) => write!(f, "{}", b.to_string()),
             Self::Nil => write!(f, "nil"),
+            Self::Uninit => write!(f, "uninit"),
             Self::Break => write!(f, "break"),
             Self::Continue => write!(f, "continue"),
-            Self::Callable(..) => write!(f, "callable"),
+            Self::Callable(inner) => write!(f, "callable {:?}", inner),
             Self::Return(..) => write!(f, "return"),
         }
     }
 }
 
+#[derive(Debug)]
 pub enum ExecutorError {
     RuntimeError(Token, String),
 }
@@ -117,30 +137,22 @@ pub trait Interpretable {
     fn interpret(&self, environment: &mut Environment) -> RuntimeResult;
 }
 
-pub struct Interpreter {
-    // this might be awful
-    pub stack: Vec<TokenLiteral>,
-    pub environment: Environment,
-}
-
 impl Interpretable for Expr {
     fn interpret(&self, environment: &mut Environment) -> RuntimeResult {
         match self {
             Expr::Assign(token, expr) => {
                 let val = expr.interpret(environment)?;
-                println!("assign | name: {:?} val: {:?}", token, val);
                 environment.assign(&token.lexeme, val.into())?;
+                Ok(Value::Nil)
             }
-            Expr::Binary(inner) => return inner.interpret(environment),
-            Expr::Unary(inner) => return inner.interpret(environment),
+            Expr::Binary(inner) => inner.interpret(environment),
+            Expr::Unary(inner) => inner.interpret(environment),
 
             Expr::Call(callee, paren, arguments) => {
-                let callee_name = callee.interpret(environment)?;
-                let mut function = environment.get(&callee_name.to_string())?.clone();
-                match function {
-                    Value::Callable(_) => (),
+                let mut function = match callee.interpret(environment)? {
+                    Value::Callable(inner) => inner,
                     _ => {
-                        println!("{:?}", function);
+                        println!("{:?}", callee);
                         return Err(ExecutorError::RuntimeError(
                             paren.clone(),
                             "Can only call functions and classes.".into(),
@@ -148,8 +160,6 @@ impl Interpretable for Expr {
                     }
                 };
 
-                unimplemented!();
-                /*
                 if arguments.len() != function.arity() {
                     return Err(ExecutorError::RuntimeError(
                         paren.clone(),
@@ -166,22 +176,25 @@ impl Interpretable for Expr {
                     args.push(arg.interpret(environment)?);
                 }
 
-                */
-                //let function_val = function.call(self, args)?;
-                //function_val.execute(environment)?;
+                function.call(environment, args)
             }
 
-            Expr::Logical(inner) => return inner.interpret(environment),
+            Expr::Logical(inner) => inner.interpret(environment),
 
-            Expr::Grouping(expression) => return expression.interpret(environment),
-            Expr::Literal(literal) => return Ok(literal.clone().into()),
+            Expr::Grouping(expression) => expression.interpret(environment),
+            Expr::Literal(literal) => Ok(literal.clone().into()),
             Expr::Variable(token) => {
                 let lookup = environment.get(&token.lexeme)?;
 
-                return Ok(lookup.clone());
+                match lookup {
+                    Value::Uninit => Err(ExecutorError::RuntimeError(
+                        token.clone(),
+                        "Variable used before initalization".into(),
+                    )),
+                    _ => Ok(lookup.clone()),
+                }
             }
         }
-        Ok(Value::Nil)
     }
 }
 
@@ -303,22 +316,18 @@ impl Executable for Statement {
                     else_branch.execute(environment)
                 }
             }
-            Statement::Function(name, args, body, env) => {
+            Statement::Function(name, args, body, _env) => {
+                /*
                 let env = if env.is_some() {
                     println!("{:#?}", env);
                     env.clone()
                 } else {
                     Some(Environment::new_enclosed(environment.clone()))
                 };
-                unimplemented!();
-
-                /*
-                environment.define(
-                    &name.lexeme,
-                    Statement::Function(name.clone(), args.clone(), body.clone(), env),
-                );
                 */
-                //Ok(Value::Nil)
+
+                environment.define(&name.lexeme, Function::new_callable(args, body).into());
+                Ok(Value::Nil)
             }
             Statement::Print(expr) => {
                 let value = expr.interpret(environment)?;
@@ -343,7 +352,9 @@ impl Executable for Statement {
                 }
             },
             Statement::Block(block) => block.execute(environment),
-            Statement::Return(_keyword, value) => value.interpret(environment),
+            Statement::Return(_keyword, value) => {
+                Ok(Value::Return(value.interpret(environment)?.into()))
+            }
         }
     }
 }
@@ -357,7 +368,7 @@ impl Executable for StatementBlock {
             match stmt.execute(environment)? {
                 Value::Break => break,
                 Value::Return(value) => {
-                    return Ok(Value::Return(value));
+                    return Ok(*value);
                 }
                 Value::Continue => {
                     // need to do increment in for loop if continue'd, check if last stmt is ForIncr
@@ -403,18 +414,72 @@ fn check_number_operands(
     }
 }
 
+pub struct Interpreter {
+    // this might be awful
+    pub stack: Vec<TokenLiteral>,
+    pub environment: Rc<Environment>,
+}
+
 impl Interpreter {
     pub fn new() -> Self {
+        let mut environment = Environment::new();
+        environment.define("clock", Value::Callable(Callable::Clock));
+
         Self {
             stack: Vec::new(),
-            environment: Environment::new(),
+            environment: environment.into(),
         }
     }
 
     pub fn interpret(&mut self, stmts: &[Statement]) -> RuntimeResult {
         for stmt in stmts {
-            stmt.execute(&mut self.environment)?;
+            stmt.execute(&mut Rc::get_mut(&mut self.environment).unwrap())?;
         }
         Ok(Value::Nil)
+    }
+}
+
+impl From<Callable> for Value {
+    fn from(c: Callable) -> Self {
+        Self::Callable(c)
+    }
+}
+
+impl From<&str> for Value {
+    fn from(v: &str) -> Self {
+        Self::Str(v.into())
+    }
+}
+
+impl From<String> for Value {
+    fn from(v: String) -> Self {
+        Self::Str(v.into())
+    }
+}
+
+impl From<f64> for Value {
+    fn from(v: f64) -> Self {
+        Self::Number(v.into())
+    }
+}
+
+impl From<bool> for Value {
+    fn from(v: bool) -> Self {
+        Self::Bool(v.into())
+    }
+}
+
+impl From<TokenLiteral> for Value {
+    fn from(v: TokenLiteral) -> Self {
+        match v {
+            TokenLiteral::Identifier(s) => Self::Str(s),
+            TokenLiteral::Str(s) => Self::Str(s),
+            TokenLiteral::Number(n) => Self::Number(n),
+            TokenLiteral::Bool(b) => Self::Bool(b),
+            TokenLiteral::None => Self::Nil,
+            TokenLiteral::Uninit => Self::Uninit,
+            TokenLiteral::Continue => Self::Continue,
+            TokenLiteral::Break => Self::Break,
+        }
     }
 }

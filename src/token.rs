@@ -64,10 +64,8 @@ pub enum TokenLiteral {
     Number(f64),
     None,
     Uninit,
-    // probably bad form, but required for interpreter structure
     Break,
     Continue,
-    Return(Box<TokenLiteral>),
 }
 
 impl TokenLiteral {
@@ -125,7 +123,6 @@ impl fmt::Display for TokenLiteral {
             Self::Uninit => write!(f, "uninitalized"),
             Self::Break => write!(f, "break"),
             Self::Continue => write!(f, "continue"),
-            Self::Return(..) => write!(f, "return"),
         }
     }
 }

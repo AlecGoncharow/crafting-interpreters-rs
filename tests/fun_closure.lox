@@ -1,7 +1,6 @@
 fun make_counter() {
 	var i = 0;
 	fun count() {
-		print "in count";
 		i = i + 1;
 		print i;
 	}
@@ -9,9 +8,9 @@ fun make_counter() {
 	return count;
 }
 
-make_counter();
+var counter = make_counter();
 
-count();
-count();
-count();
+counter();
+counter();
+counter();
 
