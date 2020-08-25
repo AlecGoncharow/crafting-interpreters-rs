@@ -69,7 +69,6 @@ impl Resolvable for LogicalExpr {
 
 impl Resolvable for Statement {
     fn resolve(&self, resolver: &mut Resolver) {
-        unimplemented!();
         match self {
             Statement::Expr(expr) | Statement::ForIncr(expr) => expr.resolve(resolver),
             Statement::If(cond, then_branch, else_branch) => {
@@ -82,7 +81,11 @@ impl Resolvable for Statement {
                 unimplemented!();
             }
             Statement::Var(token, expr) => {
-                unimplemented!();
+                resolver.declare(token);
+                if expr != &Expr::Literal(TokenLiteral::Uninit) {
+                    expr.resolve(resolver);
+                }
+                resolver.define(token);
             }
             Statement::While(expr, stmt) => loop {
                 unimplemented!();
@@ -97,13 +100,49 @@ impl Resolvable for Statement {
 
 impl Resolvable for StatementBlock {
     fn resolve(&self, resolver: &mut Resolver) {
+        resolver.begin_scope();
         // make inner env our new env
         for stmt in &self.statements {
-            unimplemented!();
+            stmt.resolve(resolver);
         }
+        resolver.end_scope();
     }
 }
 
 pub struct Resolver {
     pub scopes: Vec<HashMap<String, bool>>,
+}
+
+impl Resolver {
+    fn resolve(&mut self, interpreter: &mut Interpreter) {}
+
+    fn begin_scope(&mut self) {
+        self.scopes.push(HashMap::new());
+    }
+
+    fn end_scope(&mut self) {
+        self.scopes.pop();
+    }
+
+    fn declare(&mut self, name: &Token) {
+        if self.scopes.is_empty() {
+            return;
+        }
+
+        self.scopes
+            .first_mut()
+            .unwrap()
+            .insert(name.lexeme.clone(), false);
+    }
+
+    fn define(&mut self, name: &Token) {
+        if self.scopes.is_empty() {
+            return;
+        }
+
+        self.scopes
+            .first_mut()
+            .unwrap()
+            .insert(name.lexeme.clone(), true);
+    }
 }
