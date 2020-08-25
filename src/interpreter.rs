@@ -164,7 +164,7 @@ impl Interpretable for Expr {
                 let mut function = match callee.interpret(environment.clone())? {
                     Value::Callable(inner) => inner,
                     _ => {
-                        println!("{:?}", callee);
+                        eprintln!("tried to call: {:?}", callee);
                         return Err(ExecutorError::RuntimeError(
                             paren.clone(),
                             "Can only call functions and classes.".into(),

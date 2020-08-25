@@ -6,6 +6,7 @@ mod environment;
 mod interpreter;
 mod lox;
 mod parser;
+mod resolver;
 mod token;
 
 use std::env;
