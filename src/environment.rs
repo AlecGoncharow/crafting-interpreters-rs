@@ -58,7 +58,6 @@ impl Environment {
     pub fn get(&self, name: &str) -> Result<Value, ExecutorError> {
         match self.values.get(name) {
             Some(val) => {
-                //@TODO uninitialzied vars should error
                 return Ok(val.clone());
             }
             None => {
@@ -83,5 +82,39 @@ impl Environment {
                 ))
             }
         }
+    }
+
+    pub fn get_at(&self, distance: usize, name: &str) -> Result<Value, ExecutorError> {
+        match self.ancestor(distance).values.get(name) {
+            Some(val) => {
+                return Ok(val.clone());
+            }
+
+            None => Err(ExecutorError::RuntimeError(
+                Token::new(
+                    TokenKind::IDENTIFIER,
+                    name,
+                    TokenLiteral::Identifier(name.into()),
+                    0,
+                ),
+                "Undefined variable.".into(),
+            )),
+        }
+    }
+
+    //@TODO this has to return Rc<RefCell<>>
+    pub fn ancestor(&self, distance: usize) -> Environment {
+        let mut environment = self.clone();
+        for _ in 0..=distance {
+            environment = self
+                .enclosing
+                .as_ref()
+                .unwrap()
+                .clone()
+                .borrow_mut()
+                .clone();
+        }
+
+        environment
     }
 }

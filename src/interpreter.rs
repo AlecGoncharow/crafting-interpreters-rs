@@ -4,6 +4,7 @@ use crate::token::Token;
 use crate::token::TokenKind;
 use crate::token::TokenLiteral;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 #[derive(Debug, PartialEq, Clone)]
@@ -421,6 +422,7 @@ pub struct Interpreter {
     // this might be awful
     pub stack: Vec<TokenLiteral>,
     pub environment: Rc<RefCell<Environment>>,
+    pub locals: HashMap<String, usize>,
 }
 
 impl Interpreter {
@@ -431,6 +433,7 @@ impl Interpreter {
         Self {
             stack: Vec::new(),
             environment: Rc::new(environment.into()),
+            locals: HashMap::new(),
         }
     }
 
@@ -439,6 +442,22 @@ impl Interpreter {
             stmt.execute(self.environment.clone())?;
         }
         Ok(Value::Nil)
+    }
+
+    pub fn resolve(&mut self, token: &Token, depth: usize) {
+        self.locals.insert(token.lexeme.clone(), depth);
+    }
+
+    pub fn lookup_variable(
+        &self,
+        token: &Token,
+        environment: Rc<RefCell<Environment>>,
+    ) -> RuntimeResult {
+        if let Some(distance) = self.locals.get(&token.lexeme) {
+            environment.borrow().get_at(*distance, &token.lexeme)
+        } else {
+            self.environment.borrow().get(&token.lexeme)
+        }
     }
 }
 
