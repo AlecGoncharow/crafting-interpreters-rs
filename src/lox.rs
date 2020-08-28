@@ -2,6 +2,8 @@ use crate::ast::AstPrinter;
 use crate::interpreter::ExecutorError;
 use crate::interpreter::Interpreter;
 use crate::parser::{ParseError, Parser};
+use crate::resolver::ResolveError;
+use crate::resolver::Resolver;
 use crate::token::{Token, TokenKind, TokenLiteral};
 use std::fs;
 use std::io;
@@ -38,26 +40,32 @@ fn simple_write(s: &str) -> io::Result<()> {
 
 pub fn run_file(path: &str) -> io::Result<()> {
     let mut interpreter = Interpreter::new();
+    let mut resolver = Resolver::new();
     let bytes = fs::read(path)?;
-    run(&mut interpreter, &String::from_utf8(bytes).unwrap())?;
+    run(
+        &mut interpreter,
+        &mut resolver,
+        &String::from_utf8(bytes).unwrap(),
+    )?;
     Ok(())
 }
 
 /// REPL
 pub fn run_prompt() -> io::Result<()> {
     let mut interpreter = Interpreter::new();
+    let mut resolver = Resolver::new();
     loop {
         simple_write("> ")?;
 
         let mut input = String::new();
         match io::stdin().read_line(&mut input) {
-            Ok(_) => run(&mut interpreter, &input)?,
+            Ok(_) => run(&mut interpreter, &mut resolver, &input)?,
             Err(e) => eprintln!("{}", e),
         }
     }
 }
 
-fn run(interpreter: &mut Interpreter, source: &str) -> io::Result<()> {
+fn run(interpreter: &mut Interpreter, resolver: &mut Resolver, source: &str) -> io::Result<()> {
     let lox = Lox::new();
     let mut scanner = Scanner::new(lox, source);
     let tokens = scanner.scan_tokens();
@@ -79,6 +87,21 @@ fn run(interpreter: &mut Interpreter, source: &str) -> io::Result<()> {
             scanner.lox.error(token.line, &msg);
         }
     }
+
+    println!("resolver");
+    match resolver.resolve(interpreter, &stmts) {
+        Ok(()) => (),
+        Err(
+            ResolveError::ScopeError(token, msg)
+            | ResolveError::Duplicate(token, msg)
+            | ResolveError::GlobalReturn(token, msg),
+        ) => {
+            scanner.lox.error(token.line, &msg);
+            return Err(Error::new(ErrorKind::Other, msg));
+        }
+    }
+
+    println!("interpreter");
     let error = interpreter.interpret(&stmts);
 
     if let Err(ExecutorError::RuntimeError(token, msg)) = error {

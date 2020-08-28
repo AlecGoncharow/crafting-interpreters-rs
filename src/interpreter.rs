@@ -41,6 +41,7 @@ impl Function {
 impl Callable {
     pub fn call(
         &mut self,
+        interpreter: &mut Interpreter,
         _environment: Rc<RefCell<Environment>>,
         args: Vec<Value>,
     ) -> RuntimeResult {
@@ -69,7 +70,7 @@ impl Callable {
                     );
                 }
 
-                function.body.execute(environment)
+                function.body.execute(interpreter, environment)
             }
         }
     }
@@ -143,26 +144,45 @@ pub enum ExecutorError {
 pub type RuntimeResult = Result<Value, ExecutorError>;
 
 pub trait Executable {
-    fn execute(&self, environment: Rc<RefCell<Environment>>) -> RuntimeResult;
+    fn execute(
+        &self,
+        interpreter: &mut Interpreter,
+        environment: Rc<RefCell<Environment>>,
+    ) -> RuntimeResult;
 }
 
 pub trait Interpretable {
-    fn interpret(&self, environment: Rc<RefCell<Environment>>) -> RuntimeResult;
+    fn interpret(
+        &self,
+        interpreter: &mut Interpreter,
+        environment: Rc<RefCell<Environment>>,
+    ) -> RuntimeResult;
 }
 
 impl Interpretable for Expr {
-    fn interpret(&self, environment: Rc<RefCell<Environment>>) -> RuntimeResult {
+    fn interpret(
+        &self,
+        interpreter: &mut Interpreter,
+        environment: Rc<RefCell<Environment>>,
+    ) -> RuntimeResult {
         match self {
             Expr::Assign(token, expr) => {
-                let val = expr.interpret(environment.clone())?;
-                environment.borrow_mut().assign(&token.lexeme, val.into())?;
+                let val = expr.interpret(interpreter, environment.clone())?;
+
+                if let Some(distance) = interpreter.locals.get(&token.lexeme) {
+                    environment
+                        .borrow_mut()
+                        .assign_at(*distance, &token.lexeme, val.into())?;
+                } else {
+                    environment.borrow_mut().assign(&token.lexeme, val.into())?;
+                }
                 Ok(Value::Nil)
             }
-            Expr::Binary(inner) => inner.interpret(environment),
-            Expr::Unary(inner) => inner.interpret(environment),
+            Expr::Binary(inner) => inner.interpret(interpreter, environment),
+            Expr::Unary(inner) => inner.interpret(interpreter, environment),
 
             Expr::Call(callee, paren, arguments) => {
-                let mut function = match callee.interpret(environment.clone())? {
+                let mut function = match callee.interpret(interpreter, environment.clone())? {
                     Value::Callable(inner) => inner,
                     _ => {
                         eprintln!("tried to call: {:?}", callee);
@@ -186,18 +206,22 @@ impl Interpretable for Expr {
 
                 let mut args = Vec::new();
                 for arg in arguments {
-                    args.push(arg.execute(environment.clone())?);
+                    args.push(arg.execute(interpreter, environment.clone())?);
                 }
 
-                function.call(environment, args)
+                function.call(interpreter, environment, args)
             }
 
-            Expr::Logical(inner) => inner.interpret(environment),
+            Expr::Logical(inner) => inner.interpret(interpreter, environment),
 
-            Expr::Grouping(expression) => expression.interpret(environment),
+            Expr::Grouping(expression) => expression.interpret(interpreter, environment),
             Expr::Literal(literal) => Ok(literal.clone().into()),
             Expr::Variable(token) => {
-                let lookup = environment.borrow().get(&token.lexeme)?;
+                let lookup = if let Some(distance) = interpreter.locals.get(&token.lexeme) {
+                    environment.borrow_mut().get_at(*distance, &token.lexeme)?
+                } else {
+                    interpreter.globals.borrow().get(&token.lexeme)?
+                };
 
                 match lookup {
                     Value::Uninit => Err(ExecutorError::RuntimeError(
@@ -212,9 +236,13 @@ impl Interpretable for Expr {
 }
 
 impl Interpretable for BinaryExpr {
-    fn interpret(&self, environment: Rc<RefCell<Environment>>) -> RuntimeResult {
-        let left = self.left.interpret(environment.clone())?;
-        let right = self.right.interpret(environment)?;
+    fn interpret(
+        &self,
+        interpreter: &mut Interpreter,
+        environment: Rc<RefCell<Environment>>,
+    ) -> RuntimeResult {
+        let left = self.left.interpret(interpreter, environment.clone())?;
+        let right = self.right.interpret(interpreter, environment)?;
 
         Ok(match self.operator.kind {
             TokenKind::MINUS => {
@@ -277,8 +305,12 @@ impl Interpretable for BinaryExpr {
 }
 
 impl Interpretable for UnaryExpr {
-    fn interpret(&self, environment: Rc<RefCell<Environment>>) -> RuntimeResult {
-        let right = self.expr.interpret(environment)?;
+    fn interpret(
+        &self,
+        interpreter: &mut Interpreter,
+        environment: Rc<RefCell<Environment>>,
+    ) -> RuntimeResult {
+        let right = self.expr.interpret(interpreter, environment)?;
         Ok(match self.operator.kind {
             TokenKind::MINUS => {
                 let right = get_number_operand(&self.operator, &right)?;
@@ -292,9 +324,13 @@ impl Interpretable for UnaryExpr {
 }
 
 impl Interpretable for LogicalExpr {
-    fn interpret(&self, environment: Rc<RefCell<Environment>>) -> RuntimeResult {
+    fn interpret(
+        &self,
+        interpreter: &mut Interpreter,
+        environment: Rc<RefCell<Environment>>,
+    ) -> RuntimeResult {
         // only evaluate left to possibly short circut
-        let left = self.left.interpret(environment.clone())?;
+        let left = self.left.interpret(interpreter, environment.clone())?;
         match self.operator.kind {
             TokenKind::OR => {
                 if left.is_truthy() {
@@ -312,21 +348,27 @@ impl Interpretable for LogicalExpr {
         }
 
         // couldn't short circut, eval right
-        self.right.interpret(environment)
+        self.right.interpret(interpreter, environment)
     }
 }
 
 impl Executable for Statement {
-    fn execute(&self, environment: Rc<RefCell<Environment>>) -> RuntimeResult {
+    fn execute(
+        &self,
+        interpreter: &mut Interpreter,
+        environment: Rc<RefCell<Environment>>,
+    ) -> RuntimeResult {
         match self {
-            Statement::Expr(expr) | Statement::ForIncr(expr) => expr.interpret(environment),
+            Statement::Expr(expr) | Statement::ForIncr(expr) => {
+                expr.interpret(interpreter, environment)
+            }
             Statement::If(cond, then_branch, else_branch) => {
-                let out = cond.interpret(environment.clone())?;
+                let out = cond.interpret(interpreter, environment.clone())?;
 
                 if out.is_truthy() {
-                    then_branch.execute(environment)
+                    then_branch.execute(interpreter, environment)
                 } else {
-                    else_branch.execute(environment)
+                    else_branch.execute(interpreter, environment)
                 }
             }
             Statement::Function(name, args, body, _env) => {
@@ -336,42 +378,46 @@ impl Executable for Statement {
                 Ok(func)
             }
             Statement::Print(expr) => {
-                let value = expr.interpret(environment)?;
+                let value = expr.interpret(interpreter, environment)?;
                 println!("{}", value);
                 Ok(Value::Nil)
             }
             Statement::Var(token, expr) => {
-                let val = expr.interpret(environment.clone())?;
+                let val = expr.interpret(interpreter, environment.clone())?;
                 environment.borrow_mut().define(&token.lexeme, val.into());
                 Ok(Value::Nil)
             }
             Statement::While(expr, stmt) => loop {
-                let out = expr.interpret(environment.clone())?;
+                let out = expr.interpret(interpreter, environment.clone())?;
 
                 if !out.is_truthy() {
                     return Ok(Value::Nil);
                 }
-                match stmt.execute(environment.clone())? {
+                match stmt.execute(interpreter, environment.clone())? {
                     Value::Break => return Ok(Value::Nil),
                     Value::Return(value) => return Ok(*value),
                     _ => (),
                 }
             },
-            Statement::Block(block) => block.execute(environment),
-            Statement::Return(_keyword, value) => {
-                Ok(Value::Return(value.interpret(environment)?.into()))
-            }
+            Statement::Block(block) => block.execute(interpreter, environment),
+            Statement::Return(_keyword, value) => Ok(Value::Return(
+                value.interpret(interpreter, environment)?.into(),
+            )),
         }
     }
 }
 
 impl Executable for StatementBlock {
-    fn execute(&self, environment: Rc<RefCell<Environment>>) -> RuntimeResult {
+    fn execute(
+        &self,
+        interpreter: &mut Interpreter,
+        environment: Rc<RefCell<Environment>>,
+    ) -> RuntimeResult {
         // make inner env our new env
         let environment = Rc::new(RefCell::new(Environment::new_enclosed(environment)));
 
         for stmt in &self.statements {
-            match stmt.execute(environment.clone())? {
+            match stmt.execute(interpreter, environment.clone())? {
                 Value::Break => break,
                 Value::Return(value) => {
                     return Ok(*value);
@@ -379,7 +425,7 @@ impl Executable for StatementBlock {
                 Value::Continue => {
                     // need to do increment in for loop if continue'd, check if last stmt is ForIncr
                     if let Statement::ForIncr(expr) = self.statements.last().unwrap() {
-                        expr.interpret(environment)?;
+                        expr.interpret(interpreter, environment)?;
                     }
                     break;
                 }
@@ -421,25 +467,25 @@ fn get_number_operands(
 pub struct Interpreter {
     // this might be awful
     pub stack: Vec<TokenLiteral>,
-    pub environment: Rc<RefCell<Environment>>,
+    pub globals: Rc<RefCell<Environment>>,
     pub locals: HashMap<String, usize>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
-        let mut environment = Environment::new();
-        environment.define("clock", Value::Callable(Callable::Clock));
+        let mut globals = Environment::new();
+        globals.define("clock", Value::Callable(Callable::Clock));
 
         Self {
             stack: Vec::new(),
-            environment: Rc::new(environment.into()),
+            globals: Rc::new(globals.into()),
             locals: HashMap::new(),
         }
     }
 
     pub fn interpret(&mut self, stmts: &[Statement]) -> RuntimeResult {
         for stmt in stmts {
-            stmt.execute(self.environment.clone())?;
+            stmt.execute(self, self.globals.clone())?;
         }
         Ok(Value::Nil)
     }
@@ -456,7 +502,7 @@ impl Interpreter {
         if let Some(distance) = self.locals.get(&token.lexeme) {
             environment.borrow().get_at(*distance, &token.lexeme)
         } else {
-            self.environment.borrow().get(&token.lexeme)
+            self.globals.borrow().get(&token.lexeme)
         }
     }
 }

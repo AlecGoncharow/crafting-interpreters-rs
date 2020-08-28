@@ -55,6 +55,20 @@ impl Environment {
         }
     }
 
+    pub fn assign_at(
+        &mut self,
+        distance: usize,
+        name: &str,
+        val: Value,
+    ) -> Result<(), ExecutorError> {
+        self.ancestor(distance)
+            .unwrap()
+            .borrow_mut()
+            .values
+            .insert(name.into(), val);
+        Ok(())
+    }
+
     pub fn get(&self, name: &str) -> Result<Value, ExecutorError> {
         match self.values.get(name) {
             Some(val) => {
@@ -85,7 +99,7 @@ impl Environment {
     }
 
     pub fn get_at(&self, distance: usize, name: &str) -> Result<Value, ExecutorError> {
-        match self.ancestor(distance).values.get(name) {
+        match self.ancestor(distance).unwrap().borrow().values.get(name) {
             Some(val) => {
                 return Ok(val.clone());
             }
@@ -103,16 +117,15 @@ impl Environment {
     }
 
     //@TODO this has to return Rc<RefCell<>>
-    pub fn ancestor(&self, distance: usize) -> Environment {
-        let mut environment = self.clone();
-        for _ in 0..=distance {
-            environment = self
-                .enclosing
-                .as_ref()
-                .unwrap()
-                .clone()
-                .borrow_mut()
-                .clone();
+    pub fn ancestor(&self, distance: usize) -> Option<Rc<RefCell<Environment>>> {
+        let mut environment = self.enclosing.clone();
+
+        if distance == 0 {
+            return Some(Rc::new(RefCell::new(self.clone())));
+        }
+
+        for _ in 0..=distance - 1 {
+            environment = environment.unwrap().clone().borrow().enclosing.clone();
         }
 
         environment

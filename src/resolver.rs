@@ -6,6 +6,8 @@ use std::collections::HashMap;
 
 pub enum ResolveError {
     ScopeError(Token, String),
+    Duplicate(Token, String),
+    GlobalReturn(Token, String),
 }
 
 pub trait Resolvable {
@@ -113,26 +115,33 @@ impl Resolvable for Statement {
                 else_branch.resolve(resolver, interpreter)?;
             }
             Statement::Function(name, args, body, _env) => {
-                resolver.declare(name);
+                resolver.declare(name)?;
                 resolver.define(name);
-                resolver.resolve_funciton(interpreter, args, body)?;
+                resolver.resolve_funciton(interpreter, args, body, FunctionType::Function)?;
             }
             Statement::Print(expr) => {
                 expr.resolve(resolver, interpreter)?;
             }
             Statement::Var(token, expr) => {
-                resolver.declare(token);
+                resolver.declare(token)?;
                 if expr != &Expr::Literal(TokenLiteral::Uninit) {
                     expr.resolve(resolver, interpreter)?;
                 }
                 resolver.define(token);
             }
-            Statement::While(expr, stmt) => loop {
+            Statement::While(expr, stmt) => {
                 expr.resolve(resolver, interpreter)?;
                 stmt.resolve(resolver, interpreter)?;
-            },
+            }
             Statement::Block(block) => block.resolve(resolver, interpreter)?,
-            Statement::Return(_keyword, value) => {
+            Statement::Return(keyword, value) => {
+                if resolver.current_fun == FunctionType::None {
+                    return Err(ResolveError::GlobalReturn(
+                        keyword.clone(),
+                        "Cannot return from top-level code.".into(),
+                    ));
+                }
+
                 value.resolve(resolver, interpreter)?;
             }
         }
@@ -147,7 +156,6 @@ impl Resolvable for StatementBlock {
         interpreter: &mut Interpreter,
     ) -> Result<(), ResolveError> {
         resolver.begin_scope();
-        // make inner env our new env
         for stmt in &self.statements {
             stmt.resolve(resolver, interpreter)?;
         }
@@ -156,16 +164,26 @@ impl Resolvable for StatementBlock {
     }
 }
 
+#[derive(Copy, Clone, PartialEq)]
+pub enum FunctionType {
+    None,
+    Function,
+}
+
 pub struct Resolver {
     pub scopes: Vec<HashMap<String, bool>>,
+    pub current_fun: FunctionType,
 }
 
 impl Resolver {
-    fn new() -> Self {
-        Self { scopes: Vec::new() }
+    pub fn new() -> Self {
+        Self {
+            scopes: Vec::new(),
+            current_fun: FunctionType::None,
+        }
     }
 
-    fn resolve(
+    pub fn resolve(
         &mut self,
         interpreter: &mut Interpreter,
         statements: &Vec<Statement>,
@@ -185,24 +203,31 @@ impl Resolver {
         self.scopes.pop();
     }
 
-    fn declare(&mut self, name: &Token) {
+    fn declare(&mut self, name: &Token) -> Result<(), ResolveError> {
         if self.scopes.is_empty() {
-            return;
+            return Ok(());
         }
 
-        self.scopes
-            .first_mut()
-            .unwrap()
-            .insert(name.lexeme.clone(), false);
+        let scope = self.scopes.last_mut().unwrap();
+
+        if scope.contains_key(&name.lexeme) {
+            Err(ResolveError::Duplicate(
+                name.clone(),
+                "Variable with this name already declared in this scope.".into(),
+            ))
+        } else {
+            scope.insert(name.lexeme.clone(), false);
+            Ok(())
+        }
     }
 
     fn define(&mut self, name: &Token) {
         if self.scopes.is_empty() {
-            return;
+            return ();
         }
 
         self.scopes
-            .first_mut()
+            .last_mut()
             .unwrap()
             .insert(name.lexeme.clone(), true);
     }
@@ -212,20 +237,30 @@ impl Resolver {
         interpreter: &mut Interpreter,
         params: &Vec<Token>,
         body: &StatementBlock,
+        fun_type: FunctionType,
     ) -> Result<(), ResolveError> {
+        let enclosing_fun = self.current_fun;
+        self.current_fun = fun_type;
+
         self.begin_scope();
         for param in params {
-            self.declare(param);
+            self.declare(param)?;
             self.define(param);
         }
 
         body.resolve(self, interpreter)?;
         self.end_scope();
+
+        self.current_fun = enclosing_fun;
         Ok(())
     }
 
     fn resolve_local(&mut self, interpreter: &mut Interpreter, token: &Token) {
-        for i in self.scopes.len() - 1..=0 {
+        if self.scopes.len() == 0 {
+            return;
+        }
+
+        for i in (self.scopes.len() - 1)..=0 {
             if self.scopes.get(i).unwrap().contains_key(&token.lexeme) {
                 interpreter.resolve(token, self.scopes.len() - 1 - i);
             }
