@@ -1,6 +1,7 @@
 use crate::ast::AstPrinter;
 use crate::interpreter::ExecutorError;
 use crate::interpreter::Interpreter;
+use crate::interpreter::Value;
 use crate::parser::{ParseError, Parser};
 use crate::resolver::ResolveError;
 use crate::resolver::Resolver;
@@ -38,7 +39,7 @@ fn simple_write(s: &str) -> io::Result<()> {
     Ok(())
 }
 
-pub fn run_file(path: &str) -> io::Result<()> {
+pub fn run_file(path: &str) -> io::Result<Value> {
     let mut interpreter = Interpreter::new();
     let mut resolver = Resolver::new();
     let bytes = fs::read(path)?;
@@ -46,26 +47,32 @@ pub fn run_file(path: &str) -> io::Result<()> {
         &mut interpreter,
         &mut resolver,
         &String::from_utf8(bytes).unwrap(),
-    )?;
-    Ok(())
+    )
 }
 
 /// REPL
-pub fn run_prompt() -> io::Result<()> {
+pub fn run_prompt() -> io::Result<Value> {
     let mut interpreter = Interpreter::new();
     let mut resolver = Resolver::new();
     loop {
         simple_write("> ")?;
 
         let mut input = String::new();
-        match io::stdin().read_line(&mut input) {
-            Ok(_) => run(&mut interpreter, &mut resolver, &input)?,
-            Err(e) => eprintln!("{}", e),
-        }
+        let value = match io::stdin().read_line(&mut input) {
+            Ok(_) => match run(&mut interpreter, &mut resolver, &input) {
+                Ok(v) => v,
+                Err(_) => Value::Nil,
+            },
+            Err(e) => {
+                eprintln!("{}", e);
+                Value::Nil
+            }
+        };
+        println!("{:?}", value);
     }
 }
 
-fn run(interpreter: &mut Interpreter, resolver: &mut Resolver, source: &str) -> io::Result<()> {
+fn run(interpreter: &mut Interpreter, resolver: &mut Resolver, source: &str) -> io::Result<Value> {
     let lox = Lox::new();
     let mut scanner = Scanner::new(lox, source);
     let tokens = scanner.scan_tokens();
@@ -88,7 +95,6 @@ fn run(interpreter: &mut Interpreter, resolver: &mut Resolver, source: &str) -> 
         }
     }
 
-    println!("resolver");
     match resolver.resolve(interpreter, &stmts) {
         Ok(()) => (),
         Err(
@@ -101,15 +107,14 @@ fn run(interpreter: &mut Interpreter, resolver: &mut Resolver, source: &str) -> 
         }
     }
 
-    println!("interpreter");
-    let error = interpreter.interpret(&stmts);
+    let value = interpreter.interpret(&stmts);
 
-    if let Err(ExecutorError::RuntimeError(token, msg)) = error {
+    if let Err(ExecutorError::RuntimeError(token, msg)) = value {
         scanner.lox.error(token.line, &msg);
         return Err(Error::new(ErrorKind::Other, msg));
     }
 
-    Ok(())
+    Ok(value.unwrap())
 }
 
 pub struct Scanner {
@@ -121,6 +126,7 @@ pub struct Scanner {
     start: usize,
     current: usize,
     line: usize,
+    column: usize,
 }
 
 fn is_decimal(c: char) -> bool {
@@ -169,6 +175,7 @@ impl Scanner {
             start: 0,
             current: 0,
             line: 1,
+            column: 1,
         }
     }
 
@@ -183,6 +190,7 @@ impl Scanner {
             "\0",
             TokenLiteral::None,
             self.line,
+            self.column,
         ));
 
         &self.tokens
@@ -262,7 +270,10 @@ impl Scanner {
             ' ' | '\r' | '\t' => (),
 
             // newline
-            '\n' => self.line += 1,
+            '\n' => {
+                self.line += 1;
+                self.column = 1;
+            }
 
             // string
             '"' => self.string(),
@@ -285,8 +296,13 @@ impl Scanner {
 
     fn add_token_with_value(&mut self, token_type: TokenKind, literal: TokenLiteral) {
         let text = &self.source[self.start..self.current];
-        self.tokens
-            .push(Token::new(token_type, text, literal, self.line));
+        self.tokens.push(Token::new(
+            token_type,
+            text,
+            literal,
+            self.line,
+            self.column,
+        ));
     }
 
     fn match_char(&mut self, expected: char) -> bool {
@@ -318,6 +334,7 @@ impl Scanner {
     // consume and return char and point current to next char
     fn advance(&mut self) -> char {
         self.current += 1;
+        self.column += 1;
         self.source_char_at(self.current - 1)
     }
 

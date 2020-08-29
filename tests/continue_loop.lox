@@ -8,14 +8,17 @@ for (var a = 0; a < 10; a = a + 1) {
 }
 
 var a = 0;
+var out = 1;
 while (a < 10) {
 	a = a + 1;
-	if (a < 5) {
+	if (a > 0) {
 		continue;
 	}
+	out = 0;
 	print a;
 }
 
 print a;
+out;
 
 

@@ -1,8 +1,9 @@
 use crate::ast::{Expr, Statement};
 use std::fmt;
+use std::hash::{Hash, Hasher};
 
 #[allow(non_camel_case_types, dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TokenKind {
     // Single-character tokens.
     LEFT_PAREN,
@@ -82,6 +83,21 @@ impl TokenLiteral {
     }
 }
 
+impl Hash for TokenLiteral {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            Self::Identifier(s) => s.hash(state),
+            Self::Str(s) => s.hash(state),
+            Self::Number(_) => {
+                unimplemented!();
+            }
+            Self::Bool(b) => b.hash(state),
+            Self::None => 0.hash(state),
+            _ => unimplemented!(),
+        }
+    }
+}
+
 impl PartialEq for TokenLiteral {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -92,6 +108,8 @@ impl PartialEq for TokenLiteral {
         }
     }
 }
+
+impl Eq for TokenLiteral {}
 
 impl From<TokenLiteral> for Expr {
     fn from(token: TokenLiteral) -> Self {
@@ -154,22 +172,30 @@ impl Into<Option<String>> for TokenLiteral {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Token {
     pub kind: TokenKind,
     pub lexeme: String,
     //@TODO add literal somehow
     pub literal: TokenLiteral,
     pub line: usize,
+    pub column: usize,
 }
 
 impl Token {
-    pub fn new(token_type: TokenKind, lexeme: &str, literal: TokenLiteral, line: usize) -> Self {
+    pub fn new(
+        token_type: TokenKind,
+        lexeme: &str,
+        literal: TokenLiteral,
+        line: usize,
+        column: usize,
+    ) -> Self {
         Self {
             kind: token_type,
             lexeme: lexeme.into(),
             literal,
             line,
+            column,
         }
     }
 
@@ -179,6 +205,7 @@ impl Token {
             lexeme: "".into(),
             literal: TokenLiteral::None,
             line: 0,
+            column: 0,
         }
     }
 }

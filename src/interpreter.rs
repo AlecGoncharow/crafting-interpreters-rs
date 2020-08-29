@@ -168,7 +168,7 @@ impl Interpretable for Expr {
             Expr::Assign(token, expr) => {
                 let val = expr.interpret(interpreter, environment.clone())?;
 
-                if let Some(distance) = interpreter.locals.get(&token.lexeme) {
+                if let Some(distance) = interpreter.locals.get(&token) {
                     environment
                         .borrow_mut()
                         .assign_at(*distance, &token.lexeme, val.into())?;
@@ -216,12 +216,9 @@ impl Interpretable for Expr {
             Expr::Grouping(expression) => expression.interpret(interpreter, environment),
             Expr::Literal(literal) => Ok(literal.clone().into()),
             Expr::Variable(token) => {
-                println!("get: {:?}, {:?}", token, interpreter.locals);
-                let lookup = if let Some(distance) = interpreter.locals.get(&token.lexeme) {
-                    println!("{}", distance);
+                let lookup = if let Some(distance) = interpreter.locals.get(&token) {
                     environment.borrow_mut().get_at(*distance, &token.lexeme)?
                 } else {
-                    println!("global");
                     interpreter.globals.borrow().get(&token.lexeme)?
                 };
 
@@ -420,7 +417,7 @@ impl Executable for StatementBlock {
 
         for stmt in &self.statements {
             match stmt.execute(interpreter, environment.clone())? {
-                Value::Break => break,
+                Value::Break => return Ok(Value::Break),
                 Value::Return(value) => {
                     return Ok(*value);
                 }
@@ -429,7 +426,7 @@ impl Executable for StatementBlock {
                     if let Statement::ForIncr(expr) = self.statements.last().unwrap() {
                         expr.interpret(interpreter, environment)?;
                     }
-                    break;
+                    return Ok(Value::Continue);
                 }
                 _ => (),
             }
@@ -467,10 +464,8 @@ fn get_number_operands(
 }
 
 pub struct Interpreter {
-    // this might be awful
-    pub stack: Vec<TokenLiteral>,
     pub globals: Rc<RefCell<Environment>>,
-    pub locals: HashMap<String, usize>,
+    pub locals: HashMap<Token, usize>,
 }
 
 impl Interpreter {
@@ -479,7 +474,6 @@ impl Interpreter {
         globals.define("clock", Value::Callable(Callable::Clock));
 
         Self {
-            stack: Vec::new(),
             globals: Rc::new(globals.into()),
             locals: HashMap::new(),
         }
@@ -487,14 +481,15 @@ impl Interpreter {
 
     pub fn interpret(&mut self, stmts: &[Statement]) -> RuntimeResult {
         println!("{:?}", self.locals);
+        let mut output = Value::Nil;
         for stmt in stmts {
-            stmt.execute(self, self.globals.clone())?;
+            output = stmt.execute(self, self.globals.clone())?;
         }
-        Ok(Value::Nil)
+        Ok(output)
     }
 
     pub fn resolve(&mut self, token: &Token, depth: usize) {
-        self.locals.insert(token.lexeme.clone(), depth);
+        self.locals.insert(token.clone(), depth);
     }
 
     pub fn lookup_variable(
@@ -502,7 +497,7 @@ impl Interpreter {
         token: &Token,
         environment: Rc<RefCell<Environment>>,
     ) -> RuntimeResult {
-        if let Some(distance) = self.locals.get(&token.lexeme) {
+        if let Some(distance) = self.locals.get(&token) {
             environment.borrow().get_at(*distance, &token.lexeme)
         } else {
             self.globals.borrow().get(&token.lexeme)

@@ -3,17 +3,26 @@ print nil or "yes"; // "yes".
 print true and nil;
 print 1 and true;
 
+var out;
+
 if (1 and 2 and 3 and 4) { 
 	print "numbers are truthy";
+	out = 1;
 }
 
 if (nil and 1 or true) {
 	print "or is strong";
+	out = 1;
 }
 
 if (nil and true) {
 	print "no";
+	out = 0;
 } else {
 	print "yes";
+	out = 1;
 }
+
+
+out;
 

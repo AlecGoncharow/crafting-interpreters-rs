@@ -80,9 +80,13 @@ impl Parser {
     fn function(&mut self, kind: &str) -> StatementResult {
         let name = match self.consume(TokenKind::IDENTIFIER, &format!("Expect {} name.", kind)) {
             Ok(token) => token.clone(),
-            Err(ParseError::Mismatch(token, _)) => {
-                Token::new(TokenKind::NIL, "", TokenLiteral::None, token.line)
-            }
+            Err(ParseError::Mismatch(token, _)) => Token::new(
+                TokenKind::NIL,
+                "",
+                TokenLiteral::None,
+                token.line,
+                token.column,
+            ),
             _ => unreachable!(),
         };
         self.consume(
@@ -174,7 +178,7 @@ impl Parser {
         ))
     }
 
-    // desugar for into: init; while cond; body; increment;
+    // desugar for into: {init; {while cond; body; increment}};
     fn for_statement(&mut self) -> StatementResult {
         self.consume(TokenKind::LEFT_PAREN, "Expect '(' after 'for'.")?;
 
@@ -204,7 +208,14 @@ impl Parser {
         };
         self.consume(TokenKind::RIGHT_PAREN, "Expect ')' after for clauses.")?;
 
-        let body = Statement::Block(vec![self.statement()?, increment].into());
+        let stmt_body = self.statement()?;
+        let body = Statement::Block(match stmt_body {
+            Statement::Block(mut block) => {
+                block.statements.push(increment);
+                block.statements.into()
+            }
+            _ => vec![stmt_body, increment].into(),
+        });
 
         let for_loop = Statement::While(condition, body.into());
 

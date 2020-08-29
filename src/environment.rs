@@ -47,6 +47,7 @@ impl Environment {
                             name,
                             TokenLiteral::Identifier(name.into()),
                             0,
+                            0,
                         ),
                         "Undefined variable.".into(),
                     ))
@@ -70,7 +71,6 @@ impl Environment {
     }
 
     pub fn get(&self, name: &str) -> Result<Value, ExecutorError> {
-        println!("{:?}", name);
         match self.values.get(name) {
             Some(val) => {
                 return Ok(val.clone());
@@ -92,6 +92,7 @@ impl Environment {
                         name,
                         TokenLiteral::Identifier(name.into()),
                         0,
+                        0,
                     ),
                     "Undefined variable.".into(),
                 ))
@@ -100,8 +101,6 @@ impl Environment {
     }
 
     pub fn get_at(&self, distance: usize, name: &str) -> Result<Value, ExecutorError> {
-        println!("{:?}, {}", name, distance);
-        println!("{:?}", self.values);
         match self.ancestor(distance).unwrap().borrow().values.get(name) {
             Some(val) => {
                 return Ok(val.clone());
@@ -112,6 +111,7 @@ impl Environment {
                     TokenKind::IDENTIFIER,
                     name,
                     TokenLiteral::Identifier(name.into()),
+                    0,
                     0,
                 ),
                 "Undefined variable.".into(),
@@ -127,8 +127,11 @@ impl Environment {
             return Some(Rc::new(RefCell::new(self.clone())));
         }
 
-        for _ in 0..=distance - 1 {
+        let mut i = 1;
+
+        while i < distance {
             environment = environment.unwrap().clone().borrow().enclosing.clone();
+            i += 1;
         }
 
         environment

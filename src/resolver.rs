@@ -264,6 +264,7 @@ impl Resolver {
         loop {
             if self.scopes.get(i).unwrap().contains_key(&token.lexeme) {
                 interpreter.resolve(token, self.scopes.len() - (1 + i));
+                return;
             }
 
             if i == 0 {

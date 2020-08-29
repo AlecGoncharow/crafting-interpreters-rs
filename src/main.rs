@@ -16,18 +16,22 @@ use std::io::{Error, ErrorKind};
 fn main() -> io::Result<()> {
     let args = env::args();
     match args.len() {
-        1 => lox::run_prompt(),
+        1 => {
+            lox::run_prompt()?;
+        }
         2 => {
             let path = args.last().expect("what");
-            lox::run_file(&path)
+            println!("{:?}", lox::run_file(&path));
         }
-        _ => Err(Error::new(ErrorKind::Other, "Usage: Foo [script]")),
-    }
+        _ => return Err(Error::new(ErrorKind::Other, "Usage: Foo [script]")),
+    };
+    Ok(())
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use interpreter::Value;
     static PROJECT_PATH: &'static str = env!("CARGO_MANIFEST_DIR");
     static TESTS_PATH: &'static str = "/tests/";
 
@@ -55,9 +59,51 @@ mod test {
         PROJECT_PATH.to_owned() + TESTS_PATH + s + ".lox"
     }
 
-    fn run_str(s: &str) -> io::Result<()> {
+    fn run_str(s: &str) -> io::Result<Value> {
         let path = make_path(s);
-        lox::run_file(&path)
+        Ok(lox::run_file(&path)?)
+    }
+
+    #[test]
+    fn anon_fun_is_three() {
+        let run = run_str("anon_fun").unwrap();
+        assert_eq!(run, Value::Number(3.0));
+    }
+
+    #[test]
+    fn fib_is_thirty_four() {
+        let run = run_str("fib").unwrap();
+        assert_eq!(run, Value::Number(34.0));
+    }
+
+    #[test]
+    fn scope_not_leaked() {
+        let run = run_str("leak").unwrap();
+        assert_eq!(run, Value::Str("global".into()));
+    }
+
+    #[test]
+    fn nest_fun_scope_capture() {
+        let run = run_str("fun_closure").unwrap();
+        assert_eq!(run, Value::Number(3.0));
+    }
+
+    #[test]
+    fn logical_works() {
+        let run = run_str("logical").unwrap();
+        assert_eq!(run, Value::Number(1.0));
+    }
+
+    #[test]
+    fn continue_works() {
+        let run = run_str("continue_loop").unwrap();
+        assert_eq!(run, Value::Number(1.0));
+    }
+
+    #[test]
+    fn break_works() {
+        let run = run_str("break_loop").unwrap();
+        assert_eq!(run, Value::Number(5.0));
     }
 
     test_ok!(empty_file);
