@@ -196,7 +196,7 @@ impl Resolver {
     }
 
     fn begin_scope(&mut self) {
-        self.scopes.push(HashMap::new());
+        self.scopes.push(HashMap::new())
     }
 
     fn end_scope(&mut self) {
@@ -259,11 +259,18 @@ impl Resolver {
         if self.scopes.len() == 0 {
             return;
         }
+        let mut i = self.scopes.len() - 1;
 
-        for i in (self.scopes.len() - 1)..=0 {
+        loop {
             if self.scopes.get(i).unwrap().contains_key(&token.lexeme) {
-                interpreter.resolve(token, self.scopes.len() - 1 - i);
+                interpreter.resolve(token, self.scopes.len() - (1 + i));
             }
+
+            if i == 0 {
+                return;
+            }
+
+            i -= 1;
         }
     }
 }

@@ -70,6 +70,7 @@ impl Environment {
     }
 
     pub fn get(&self, name: &str) -> Result<Value, ExecutorError> {
+        println!("{:?}", name);
         match self.values.get(name) {
             Some(val) => {
                 return Ok(val.clone());
@@ -99,6 +100,8 @@ impl Environment {
     }
 
     pub fn get_at(&self, distance: usize, name: &str) -> Result<Value, ExecutorError> {
+        println!("{:?}, {}", name, distance);
+        println!("{:?}", self.values);
         match self.ancestor(distance).unwrap().borrow().values.get(name) {
             Some(val) => {
                 return Ok(val.clone());

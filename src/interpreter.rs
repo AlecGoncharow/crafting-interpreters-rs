@@ -55,7 +55,6 @@ impl Callable {
                     .as_secs() as f64)
                     .into();
 
-                println!("{:?}", now);
                 Ok(now)
             }
             Self::Function(function) => {
@@ -217,9 +216,12 @@ impl Interpretable for Expr {
             Expr::Grouping(expression) => expression.interpret(interpreter, environment),
             Expr::Literal(literal) => Ok(literal.clone().into()),
             Expr::Variable(token) => {
+                println!("get: {:?}, {:?}", token, interpreter.locals);
                 let lookup = if let Some(distance) = interpreter.locals.get(&token.lexeme) {
+                    println!("{}", distance);
                     environment.borrow_mut().get_at(*distance, &token.lexeme)?
                 } else {
+                    println!("global");
                     interpreter.globals.borrow().get(&token.lexeme)?
                 };
 
@@ -484,6 +486,7 @@ impl Interpreter {
     }
 
     pub fn interpret(&mut self, stmts: &[Statement]) -> RuntimeResult {
+        println!("{:?}", self.locals);
         for stmt in stmts {
             stmt.execute(self, self.globals.clone())?;
         }
