@@ -1,11 +1,11 @@
 use crate::ast::AstPrinter;
 use crate::interpreter::ExecutorError;
 use crate::interpreter::Interpreter;
-use crate::interpreter::Value;
 use crate::parser::{ParseError, Parser};
 use crate::resolver::ResolveError;
 use crate::resolver::Resolver;
 use crate::token::{Token, TokenKind, TokenLiteral};
+use crate::value::Value;
 use std::fs;
 use std::io;
 use std::io::Write;
