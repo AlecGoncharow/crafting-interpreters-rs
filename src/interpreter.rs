@@ -3,7 +3,7 @@ use crate::environment::Environment;
 use crate::token::Token;
 use crate::token::TokenKind;
 use crate::token::TokenLiteral;
-use crate::value::{Callable, Function, Value};
+use crate::value::{Callable, Class, ClassInstance, Function, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -245,6 +245,7 @@ impl Executable for Statement {
             }
             Statement::Function(function) => {
                 let func: Value = Function::new_callable(
+                    function.name.lexeme.clone(),
                     &function.params,
                     function.body.clone(),
                     environment.clone(),
@@ -277,7 +278,12 @@ impl Executable for Statement {
                     _ => (),
                 }
             },
-            Statement::Class(name, methods) => unimplemented!(),
+            Statement::Class(name, _methods) => {
+                environment.borrow_mut().define(&name.lexeme, Value::Nil);
+                let class = Value::Callable(Class::new_callable(name.lexeme.clone()));
+                environment.borrow_mut().assign(&name.lexeme, class)?;
+                Ok(Value::Nil)
+            }
             Statement::Block(block) => block.execute(interpreter, environment),
             Statement::Return(_keyword, value) => Ok(Value::Return(
                 value.interpret(interpreter, environment)?.into(),

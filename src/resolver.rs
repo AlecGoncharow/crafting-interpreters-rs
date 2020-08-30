@@ -141,7 +141,10 @@ impl Resolvable for Statement {
                 expr.resolve(resolver, interpreter)?;
                 stmt.resolve(resolver, interpreter)?;
             }
-            Statement::Class(name, methods) => unimplemented!(),
+            Statement::Class(name, _methods) => {
+                resolver.declare(name)?;
+                resolver.define(name);
+            }
             Statement::Block(block) => block.resolve(resolver, interpreter)?,
             Statement::Return(keyword, value) => {
                 if resolver.current_fun == FunctionType::None {

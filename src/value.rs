@@ -11,19 +11,48 @@ use std::rc::Rc;
 #[derive(Debug, PartialEq, Clone)]
 pub enum Callable {
     Function(Function),
+    Class(Class),
+    ClassInstance(ClassInstance),
     Clock,
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub struct Class {
+    pub name: String,
+}
+
+impl Class {
+    pub fn new(name: String) -> Self {
+        Self { name }
+    }
+
+    pub fn new_callable(name: String) -> Callable {
+        Callable::Class(Self::new(name))
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ClassInstance {
+    pub class: Class,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct Function {
+    pub name: String,
     pub params: Vec<Token>,
     pub body: StatementBlock,
     pub closure: Rc<RefCell<Environment>>,
 }
 
 impl Function {
-    pub fn new(params: &[Token], body: StatementBlock, closure: Rc<RefCell<Environment>>) -> Self {
+    pub fn new(
+        name: String,
+        params: &[Token],
+        body: StatementBlock,
+        closure: Rc<RefCell<Environment>>,
+    ) -> Self {
         Self {
+            name,
             params: params.into(),
             body,
             closure,
@@ -31,11 +60,12 @@ impl Function {
     }
 
     pub fn new_callable(
+        name: String,
         params: &[Token],
         body: StatementBlock,
         closure: Rc<RefCell<Environment>>,
     ) -> Callable {
-        Callable::Function(Self::new(params, body, closure))
+        Callable::Function(Self::new(name, params, body, closure))
     }
 }
 
@@ -72,12 +102,22 @@ impl Callable {
 
                 function.body.execute(interpreter, environment)
             }
+            Self::Class(class) => {
+                let instance = Self::ClassInstance(ClassInstance {
+                    class: class.clone(),
+                });
+
+                Ok(Value::Callable(instance))
+            }
+            Self::ClassInstance(intance) => {
+                unimplemented!();
+            }
         }
     }
 
     pub fn arity(&self) -> usize {
         match self {
-            Self::Clock => 0,
+            Self::Clock | Self::Class(_) | Self::ClassInstance(_) => 0,
             Self::Function(function) => function.params.len(),
         }
     }
@@ -130,8 +170,19 @@ impl fmt::Display for Value {
             Self::Uninit => write!(f, "uninit"),
             Self::Break => write!(f, "break"),
             Self::Continue => write!(f, "continue"),
-            Self::Callable(inner) => write!(f, "callable {:?}", inner),
+            Self::Callable(inner) => write!(f, "callable {}", inner),
             Self::Return(..) => write!(f, "return"),
+        }
+    }
+}
+
+impl fmt::Display for Callable {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Clock => write!(f, "std::Clock"),
+            Self::Function(fun) => write!(f, "Function {:?}", fun.name),
+            Self::Class(class) => write!(f, "Class {:?}", class.name),
+            Self::ClassInstance(inst) => write!(f, "{:?} instance", inst.class.name),
         }
     }
 }
