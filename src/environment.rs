@@ -119,15 +119,10 @@ impl Environment {
         }
     }
 
-    //@TODO this has to return Rc<RefCell<>>
     pub fn ancestor(&self, distance: usize) -> Option<Rc<RefCell<Environment>>> {
-        let mut environment = self.enclosing.clone();
+        let mut environment = Some(Rc::new(RefCell::new(self.clone())));
 
-        if distance == 0 {
-            return Some(Rc::new(RefCell::new(self.clone())));
-        }
-
-        let mut i = 1;
+        let mut i = 0;
 
         while i < distance {
             environment = environment.unwrap().clone().borrow().enclosing.clone();
