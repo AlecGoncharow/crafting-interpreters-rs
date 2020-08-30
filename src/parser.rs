@@ -48,6 +48,8 @@ impl Parser {
             }
         } else if self.match_rule(TokenKind::FUN) {
             self.function("function")
+        } else if self.match_rule(TokenKind::CLASS) {
+            self.class_declaration()
         } else {
             match self.statement() {
                 Ok(s) => Ok(s),
@@ -122,7 +124,25 @@ impl Parser {
         )?;
         let body = self.block()?;
 
-        Ok(Statement::Function(name, paramaters, body.into(), None))
+        Ok(Statement::Function((name, paramaters, body.into()).into()))
+    }
+
+    fn class_declaration(&mut self) -> StatementResult {
+        let name = self
+            .consume(TokenKind::IDENTIFIER, "Expect class name")?
+            .clone();
+        self.consume(TokenKind::LEFT_BRACE, "Expect '{' before class body")?;
+
+        let mut methods = Vec::new();
+        while !self.check(TokenKind::RIGHT_BRACE) && !self.is_at_end() {
+            if let Statement::Function(function) = self.function("method")? {
+                methods.push(function)
+            }
+        }
+
+        self.consume(TokenKind::RIGHT_BRACE, "Expect '}' after class body.")?;
+
+        Ok(Statement::Class(name, methods))
     }
 
     fn statement(&mut self) -> StatementResult {
@@ -178,7 +198,7 @@ impl Parser {
         ))
     }
 
-    // desugar for into: {init; {while cond; body; increment}};
+    // desugar for into: {init; {while cond; {body; increment}}};
     fn for_statement(&mut self) -> StatementResult {
         self.consume(TokenKind::LEFT_PAREN, "Expect '(' after 'for'.")?;
 
@@ -209,6 +229,8 @@ impl Parser {
         self.consume(TokenKind::RIGHT_PAREN, "Expect ')' after for clauses.")?;
 
         let stmt_body = self.statement()?;
+        // keeps increment in same scope as loop body, handles difference between existing braces
+        // after loop or single stmt body
         let body = Statement::Block(match stmt_body {
             Statement::Block(mut block) => {
                 block.statements.push(increment);

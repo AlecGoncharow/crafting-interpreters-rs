@@ -370,10 +370,16 @@ impl Executable for Statement {
                     else_branch.execute(interpreter, environment)
                 }
             }
-            Statement::Function(name, args, body, _env) => {
-                let func: Value =
-                    Function::new_callable(args, body.clone(), environment.clone()).into();
-                environment.borrow_mut().define(&name.lexeme, func.clone());
+            Statement::Function(function) => {
+                let func: Value = Function::new_callable(
+                    &function.params,
+                    function.body.clone(),
+                    environment.clone(),
+                )
+                .into();
+                environment
+                    .borrow_mut()
+                    .define(&function.name.lexeme, func.clone());
                 Ok(func)
             }
             Statement::Print(expr) => {
@@ -398,6 +404,7 @@ impl Executable for Statement {
                     _ => (),
                 }
             },
+            Statement::Class(name, methods) => unimplemented!(),
             Statement::Block(block) => block.execute(interpreter, environment),
             Statement::Return(_keyword, value) => Ok(Value::Return(
                 value.interpret(interpreter, environment)?.into(),

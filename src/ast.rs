@@ -1,4 +1,3 @@
-use crate::environment::Environment;
 use crate::interpreter::ExecutorError;
 use crate::token::{Token, TokenLiteral};
 
@@ -109,13 +108,33 @@ impl From<Expr> for Statement {
 pub enum Statement {
     Expr(Expr),
     ForIncr(Expr),
-    Function(Token, Vec<Token>, StatementBlock, Option<Environment>),
+    Function(StatementFunction),
     If(Expr, Box<Statement>, Box<Statement>),
     Print(Expr),
     Var(Token, Expr),
     While(Expr, Box<Statement>),
+    Class(Token, Vec<StatementFunction>),
     Block(Box<StatementBlock>),
     Return(Token, Expr),
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct StatementFunction {
+    pub name: Token,
+    pub params: Vec<Token>,
+    pub body: StatementBlock,
+}
+
+impl From<(Token, Vec<Token>, StatementBlock)> for StatementFunction {
+    fn from((name, params, body): (Token, Vec<Token>, StatementBlock)) -> Self {
+        Self { name, params, body }
+    }
+}
+
+impl From<(Token, Vec<Token>, StatementBlock)> for Box<StatementFunction> {
+    fn from((name, params, body): (Token, Vec<Token>, StatementBlock)) -> Self {
+        Box::new(StatementFunction { name, params, body })
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -147,7 +166,7 @@ impl Statement {
 
     pub fn arity(&self) -> usize {
         match self {
-            Self::Function(_, args, _, _) => args.len(),
+            Self::Function(func) => func.params.len(),
             _ => 0,
         }
     }
@@ -224,14 +243,15 @@ impl AstPrinter {
                 self.visit_statement(else_branch)?;
                 self.buf.push(')');
             }
-            Statement::Function(name, args, body, _) => {
+            Statement::Function(func) => {
                 self.buf.push_str("(func_decl ");
-                self.buf.push_str(&name.lexeme);
+                self.buf.push_str(&func.name.lexeme);
                 self.buf.push(' ');
-                args.iter()
+                func.params
+                    .iter()
                     .for_each(|arg| self.buf.push_str(&(arg.lexeme.clone() + " ")));
                 self.buf.push_str("(block ");
-                for stmt in &body.statements {
+                for stmt in &func.body.statements {
                     self.visit_statement(stmt)?;
                 }
                 self.buf.push(')');
@@ -250,6 +270,15 @@ impl AstPrinter {
                 self.buf.push_str("(while ");
                 self.visit_expr(expr)?;
                 self.visit_statement(stmt)?;
+                self.buf.push(')');
+            }
+            Statement::Class(name, methods) => {
+                self.buf.push_str("(class_decl ");
+                self.buf.push_str(&name.lexeme);
+                self.buf.push(' ');
+                for method in methods {
+                    self.visit_statement(&Statement::Function(method.clone()))?;
+                }
                 self.buf.push(')');
             }
             Statement::Block(stmts) => {

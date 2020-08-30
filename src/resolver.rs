@@ -4,6 +4,9 @@ use crate::token::Token;
 use crate::token::TokenLiteral;
 use std::collections::HashMap;
 
+// @TODO @CHALLENGE Extend the resolver to report an error if a local variable is never used.
+// @CHALLENGE Extend the resolver to associate a unique index for each local variable declared in a scope. When resolving a variable access, look up both the scope the variable is in and its index and store that. In the interpreter, use that to quickly access a variable by its index instead of using a map.
+
 pub enum ResolveError {
     ScopeError(Token, String),
     Duplicate(Token, String),
@@ -114,10 +117,15 @@ impl Resolvable for Statement {
                 then_branch.resolve(resolver, interpreter)?;
                 else_branch.resolve(resolver, interpreter)?;
             }
-            Statement::Function(name, args, body, _env) => {
-                resolver.declare(name)?;
-                resolver.define(name);
-                resolver.resolve_funciton(interpreter, args, body, FunctionType::Function)?;
+            Statement::Function(function) => {
+                resolver.declare(&function.name)?;
+                resolver.define(&function.name);
+                resolver.resolve_funciton(
+                    interpreter,
+                    &function.params,
+                    &function.body,
+                    FunctionType::Function,
+                )?;
             }
             Statement::Print(expr) => {
                 expr.resolve(resolver, interpreter)?;
@@ -133,6 +141,7 @@ impl Resolvable for Statement {
                 expr.resolve(resolver, interpreter)?;
                 stmt.resolve(resolver, interpreter)?;
             }
+            Statement::Class(name, methods) => unimplemented!(),
             Statement::Block(block) => block.resolve(resolver, interpreter)?,
             Statement::Return(keyword, value) => {
                 if resolver.current_fun == FunctionType::None {
