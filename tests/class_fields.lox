@@ -9,4 +9,14 @@ foo.buzz = 42;
 bar.fizz = 13;
 bar.foo = 29;
 
+foo.bar = Foo();
+foo.bar.x = 5;
+
+//foo.bar.baz = Foo();
+//foo.bar.baz.y = 10;
+
+print foo.buzz;
+print bar.fizz;
+print bar.foo;
+
 foo.baz + foo.buzz + bar.fizz + bar.foo;

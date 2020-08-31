@@ -86,6 +86,23 @@ impl Interpretable for Expr {
             Expr::Get(object, name) => {
                 let object = match object.as_ref() {
                     Expr::Variable(inner) => interpreter.lookup_variable(&inner, environment)?,
+                    Expr::Get(object, _name) => {
+                        let mut next = object.as_ref();
+                        let out;
+                        loop {
+                            next = match next {
+                                Expr::Variable(inner) => {
+                                    out =
+                                        interpreter.lookup_variable(&inner, environment.clone())?;
+                                    break;
+                                }
+                                Expr::Get(object, _name) => object.as_ref(),
+                                _ => unimplemented!(),
+                            }
+                        }
+                        out
+                    }
+
                     _ => unimplemented!(),
                 };
 
@@ -98,6 +115,8 @@ impl Interpretable for Expr {
                 }
             }
 
+            // @TODO FIXME this doesn't do what it is supposed to do, nested objects just get
+            // pushed up to root object. May need smart pointers
             Expr::Set(object, name, value) => {
                 let value = value.interpret(interpreter, environment.clone())?;
                 let (object, obj_name) = match object.as_ref() {
@@ -105,6 +124,24 @@ impl Interpretable for Expr {
                         interpreter.lookup_variable(&inner, environment.clone())?,
                         inner,
                     ),
+                    Expr::Get(object, _name) => {
+                        let mut next = object.as_ref();
+                        let out;
+                        loop {
+                            next = match next {
+                                Expr::Variable(inner) => {
+                                    out = (
+                                        interpreter.lookup_variable(&inner, environment.clone())?,
+                                        inner,
+                                    );
+                                    break;
+                                }
+                                Expr::Get(object, _name) => object.as_ref(),
+                                _ => unimplemented!(),
+                            }
+                        }
+                        out
+                    }
                     _ => unimplemented!(),
                 };
 
@@ -120,7 +157,7 @@ impl Interpretable for Expr {
                     _ => unimplemented!(),
                 };
 
-                println!("set {:?}", value);
+                //println!("set {:?}", value);
                 if let Some(distance) = interpreter.locals.get(&name) {
                     environment.borrow_mut().assign_at(
                         *distance,
