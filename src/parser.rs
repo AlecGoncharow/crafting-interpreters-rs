@@ -282,13 +282,17 @@ impl Parser {
             let equals = self.previous().clone();
             let value = self.assignment()?;
 
-            if let Statement::Expr(Expr::Variable(var)) = expr {
-                Ok(Expr::Assign(var, value.expr().into()).into())
-            } else {
-                Err(ParseError::Mismatch(
+            match expr {
+                Statement::Expr(Expr::Variable(var)) => {
+                    Ok(Expr::Assign(var, value.expr().into()).into())
+                }
+                Statement::Expr(Expr::Get(object, name)) => {
+                    Ok(Expr::Set(object, name, value.expr().into()).into())
+                }
+                _ => Err(ParseError::Mismatch(
                     equals,
                     "Invalid assignment target.".into(),
-                ))
+                )),
             }
         } else {
             Ok(expr)
@@ -388,6 +392,10 @@ impl Parser {
         loop {
             if self.match_rule(TokenKind::LEFT_PAREN) {
                 expr = self.finish_call(expr.expr())?;
+            } else if self.match_rule(TokenKind::DOT) {
+                let name =
+                    self.consume(TokenKind::IDENTIFIER, "Expect property name after '.'.")?;
+                expr = Expr::Get(Box::new(expr.expr()), name.clone()).into();
             } else {
                 break;
             }

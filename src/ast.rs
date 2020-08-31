@@ -6,6 +6,8 @@ pub enum Expr {
     Assign(Token, Box<Expr>),
     Binary(Box<BinaryExpr>),
     Call(Box<Expr>, Token, Vec<Statement>),
+    Get(Box<Expr>, Token),
+    Set(Box<Expr>, Token, Box<Expr>),
     Grouping(Box<Expr>),
     Literal(TokenLiteral),
     Unary(Box<UnaryExpr>),
@@ -218,6 +220,18 @@ impl AstPrinter {
                     self.buf.push(' ');
                     self.visit_statement(arg)?;
                 }
+                self.buf.push(')');
+            }
+            Expr::Get(_object, name) => {
+                self.buf.push_str("(Get ");
+                self.buf.push_str(&name.lexeme);
+                self.buf.push(')');
+            }
+            Expr::Set(_object, name, value) => {
+                self.buf.push_str("(Set ");
+                self.buf.push_str(&name.lexeme);
+                self.buf.push(' ');
+                self.visit_expr(value)?;
                 self.buf.push(')');
             }
             Expr::Grouping(expression) => self.parenthesize("group", &[&expression])?,

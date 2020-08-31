@@ -1,10 +1,12 @@
 use crate::ast::StatementBlock;
 use crate::environment::Environment;
 use crate::interpreter::Executable;
+use crate::interpreter::ExecutorError;
 use crate::interpreter::Interpreter;
 use crate::interpreter::RuntimeResult;
 use crate::token::Token;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 
@@ -34,6 +36,35 @@ impl Class {
 #[derive(Debug, PartialEq, Clone)]
 pub struct ClassInstance {
     pub class: Class,
+    pub fields: HashMap<String, Value>,
+}
+
+impl ClassInstance {
+    pub fn new(class: &Class) -> Self {
+        Self {
+            class: class.clone(),
+            fields: HashMap::new(),
+        }
+    }
+
+    pub fn new_callable(class: &Class) -> Callable {
+        Callable::ClassInstance(Self::new(class))
+    }
+
+    pub fn get(&self, name: &Token) -> RuntimeResult {
+        if let Some(value) = self.fields.get(&name.lexeme) {
+            Ok(value.clone())
+        } else {
+            Err(ExecutorError::RuntimeError(
+                name.clone(),
+                format!("Undefined property '{}'.", name.lexeme),
+            ))
+        }
+    }
+
+    pub fn set(&mut self, name: &Token, value: Value) {
+        self.fields.insert(name.lexeme.clone(), value);
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -103,13 +134,11 @@ impl Callable {
                 function.body.execute(interpreter, environment)
             }
             Self::Class(class) => {
-                let instance = Self::ClassInstance(ClassInstance {
-                    class: class.clone(),
-                });
+                let instance = ClassInstance::new_callable(class);
 
                 Ok(Value::Callable(instance))
             }
-            Self::ClassInstance(intance) => {
+            Self::ClassInstance(instance) => {
                 unimplemented!();
             }
         }

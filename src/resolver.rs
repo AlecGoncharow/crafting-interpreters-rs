@@ -46,6 +46,11 @@ impl Resolvable for Expr {
             Expr::Logical(inner) => inner.resolve(resolver, interpreter)?,
 
             Expr::Grouping(expression) => expression.resolve(resolver, interpreter)?,
+            Expr::Get(object, _name) => object.resolve(resolver, interpreter)?,
+            Expr::Set(object, _name, value) => {
+                object.resolve(resolver, interpreter)?;
+                value.resolve(resolver, interpreter)?
+            }
             Expr::Literal(_literal) => (),
             Expr::Variable(token) => {
                 if !resolver.scopes.is_empty()

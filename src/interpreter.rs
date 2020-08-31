@@ -84,6 +84,35 @@ impl Interpretable for Expr {
                 function.call(interpreter, environment, args)
             }
 
+            Expr::Get(object, name) => {
+                let object = object.interpret(interpreter, environment)?;
+
+                match object {
+                    Value::Callable(callable) => match callable {
+                        Callable::ClassInstance(instance) => instance.get(name),
+                        _ => unimplemented!(),
+                    },
+                    _ => unimplemented!(),
+                }
+            }
+
+            Expr::Set(object, name, value) => {
+                let object = object.interpret(interpreter, environment.clone())?;
+                let value = value.interpret(interpreter, environment)?;
+
+                // @TODO this is broken, need to pull instance out of env i think
+                match object {
+                    Value::Callable(callable) => match callable {
+                        Callable::ClassInstance(mut instance) => {
+                            instance.set(name, value.clone());
+                            Ok(value)
+                        }
+                        _ => unimplemented!(),
+                    },
+                    _ => unimplemented!(),
+                }
+            }
+
             Expr::Logical(inner) => inner.interpret(interpreter, environment),
 
             Expr::Grouping(expression) => expression.interpret(interpreter, environment),
