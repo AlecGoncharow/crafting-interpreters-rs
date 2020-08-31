@@ -1,3 +1,2 @@
-![Continuous integration](https://github.com/actions-rs/cargo/workflows/Continuous%20integration/badge.svg)
-
+![Continuous Integration](https://github.com/AlecGoncharow/crafting-interpreters-rs/workflows/Continuous%20Integration/badge.svg)  
 https://craftinginterpreters.com
