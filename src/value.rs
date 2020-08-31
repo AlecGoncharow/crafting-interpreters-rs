@@ -5,6 +5,7 @@ use crate::interpreter::ExecutorError;
 use crate::interpreter::Interpreter;
 use crate::interpreter::RuntimeResult;
 use crate::token::Token;
+use crate::token::TokenLiteral;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -138,7 +139,7 @@ impl Callable {
 
                 Ok(Value::Callable(instance))
             }
-            Self::ClassInstance(instance) => {
+            Self::ClassInstance(_instance) => {
                 unimplemented!();
             }
         }
@@ -213,5 +214,62 @@ impl fmt::Display for Callable {
             Self::Class(class) => write!(f, "Class {:?}", class.name),
             Self::ClassInstance(inst) => write!(f, "{:?} instance", inst.class.name),
         }
+    }
+}
+
+impl From<&str> for Value {
+    fn from(v: &str) -> Self {
+        Self::Str(v.into())
+    }
+}
+
+impl From<String> for Value {
+    fn from(v: String) -> Self {
+        Self::Str(v.into())
+    }
+}
+
+impl From<f64> for Value {
+    fn from(v: f64) -> Self {
+        Self::Number(v.into())
+    }
+}
+
+impl From<bool> for Value {
+    fn from(v: bool) -> Self {
+        Self::Bool(v.into())
+    }
+}
+
+impl From<TokenLiteral> for Value {
+    fn from(v: TokenLiteral) -> Self {
+        match v {
+            TokenLiteral::Identifier(s) => Self::Str(s),
+            TokenLiteral::Str(s) => Self::Str(s),
+            TokenLiteral::Number(n) => Self::Number(n),
+            TokenLiteral::Bool(b) => Self::Bool(b),
+            TokenLiteral::None => Self::Nil,
+            TokenLiteral::Uninit => Self::Uninit,
+            TokenLiteral::Continue => Self::Continue,
+            TokenLiteral::Break => Self::Break,
+        }
+    }
+}
+
+impl From<Callable> for Value {
+    fn from(callable: Callable) -> Self {
+        Self::Callable(callable)
+    }
+}
+
+impl From<ClassInstance> for Value {
+    fn from(inst: ClassInstance) -> Self {
+        Self::Callable(inst.into())
+    }
+}
+
+impl From<ClassInstance> for Callable {
+    fn from(inst: ClassInstance) -> Self {
+        Callable::ClassInstance(inst)
     }
 }

@@ -1,0 +1,12 @@
+class Foo {}
+
+var foo = Foo();
+
+var bar = Foo();
+
+foo.baz = 12;
+foo.buzz = 42;
+bar.fizz = 13;
+bar.foo = 29;
+
+foo.baz + foo.buzz + bar.fizz + bar.foo;

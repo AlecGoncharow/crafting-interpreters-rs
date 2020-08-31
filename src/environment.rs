@@ -70,8 +70,8 @@ impl Environment {
         Ok(())
     }
 
-    pub fn get(&self, name: &str) -> Result<Value, ExecutorError> {
-        match self.values.get(name) {
+    pub fn get(&self, name: &Token) -> Result<Value, ExecutorError> {
+        match self.values.get(&name.lexeme) {
             Some(val) => {
                 return Ok(val.clone());
             }
@@ -87,33 +87,27 @@ impl Environment {
                 }
 
                 Err(ExecutorError::RuntimeError(
-                    Token::new(
-                        TokenKind::IDENTIFIER,
-                        name,
-                        TokenLiteral::Identifier(name.into()),
-                        0,
-                        0,
-                    ),
+                    name.clone(),
                     "Undefined variable.".into(),
                 ))
             }
         }
     }
 
-    pub fn get_at(&self, distance: usize, name: &str) -> Result<Value, ExecutorError> {
-        match self.ancestor(distance).unwrap().borrow().values.get(name) {
+    pub fn get_at(&self, distance: usize, name: &Token) -> Result<Value, ExecutorError> {
+        match self
+            .ancestor(distance)
+            .unwrap()
+            .borrow()
+            .values
+            .get(&name.lexeme)
+        {
             Some(val) => {
                 return Ok(val.clone());
             }
 
             None => Err(ExecutorError::RuntimeError(
-                Token::new(
-                    TokenKind::IDENTIFIER,
-                    name,
-                    TokenLiteral::Identifier(name.into()),
-                    0,
-                    0,
-                ),
+                name.clone(),
                 "Undefined variable.".into(),
             )),
         }
