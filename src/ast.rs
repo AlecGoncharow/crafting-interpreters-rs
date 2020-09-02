@@ -10,6 +10,7 @@ pub enum Expr {
     Set(Box<Expr>, Token, Box<Expr>),
     Grouping(Box<Expr>),
     Literal(TokenLiteral),
+    This(Token),
     Unary(Box<UnaryExpr>),
     Logical(Box<LogicalExpr>),
     Variable(Token),
@@ -236,6 +237,7 @@ impl AstPrinter {
             }
             Expr::Grouping(expression) => self.parenthesize("group", &[&expression])?,
             Expr::Literal(literal) => self.buf.push_str(&literal.to_string()),
+            Expr::This(kw) => self.buf.push_str(&kw.lexeme),
             Expr::Unary(inner) => self.parenthesize(&inner.operator.lexeme, &[&inner.expr])?,
             Expr::Variable(token) => self.buf.push_str(&token.literal.to_string()),
         }

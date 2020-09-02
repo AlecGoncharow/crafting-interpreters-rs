@@ -446,6 +446,7 @@ impl Parser {
                 Expr::Grouping(Box::new(expr.expr()))
             }
             TokenKind::IDENTIFIER => Expr::Variable(self.previous().clone()),
+            TokenKind::THIS => Expr::This(self.previous().clone()),
             _ => {
                 return Err(ParseError::Mismatch(
                     self.peek().clone(),

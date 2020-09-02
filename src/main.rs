@@ -113,6 +113,12 @@ mod test {
         assert_eq!(run, Value::Number(96.0));
     }
 
+    #[test]
+    fn class_methods_works() {
+        let run = run_str("methods").unwrap();
+        assert_eq!(run, Value::Str("it works!".into()));
+    }
+
     test_ok!(empty_file);
     test_ok!(blocks);
     test_ok!(branch);

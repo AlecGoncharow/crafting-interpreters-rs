@@ -51,6 +51,7 @@ impl Interpretable for Expr {
             }
             Expr::Binary(inner) => inner.interpret(interpreter, environment),
             Expr::Unary(inner) => inner.interpret(interpreter, environment),
+            Expr::This(token) => interpreter.lookup_variable(token, environment),
 
             Expr::Call(callee, paren, arguments) => {
                 let mut function = match callee.interpret(interpreter, environment.clone())? {
@@ -84,8 +85,10 @@ impl Interpretable for Expr {
             }
 
             Expr::Get(object, name) => {
+                println!("{:?},", object);
                 let object = match object.as_ref() {
                     Expr::Variable(inner) => interpreter.lookup_variable(&inner, environment)?,
+                    Expr::Call(_, _, _) => object.interpret(interpreter, environment.clone())?,
                     Expr::Get(object, _name) => {
                         let mut next = object.as_ref();
                         let out;
@@ -103,7 +106,7 @@ impl Interpretable for Expr {
                         out
                     }
 
-                    _ => unimplemented!(),
+                    _ => object.interpret(interpreter, environment.clone())?,
                 };
 
                 match object {
@@ -362,9 +365,23 @@ impl Executable for Statement {
                     _ => (),
                 }
             },
-            Statement::Class(name, _methods) => {
+            Statement::Class(name, methods) => {
                 environment.borrow_mut().define(&name.lexeme, Value::Nil);
-                let class = Value::Callable(Class::new_callable(name.lexeme.clone()));
+                let mut callable_methods = HashMap::new();
+
+                for method in methods {
+                    let function = Function::new(
+                        method.name.lexeme.clone(),
+                        &method.params,
+                        method.body.clone(),
+                        environment.clone(),
+                    );
+
+                    callable_methods.insert(method.name.lexeme.clone(), function);
+                }
+
+                let class =
+                    Value::Callable(Class::new_callable(name.lexeme.clone(), callable_methods));
                 environment.borrow_mut().assign(&name.lexeme, class)?;
                 Ok(Value::Nil)
             }

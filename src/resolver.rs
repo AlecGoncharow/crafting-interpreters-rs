@@ -34,6 +34,7 @@ impl Resolvable for Expr {
             }
             Expr::Binary(inner) => inner.resolve(resolver, interpreter)?,
             Expr::Unary(inner) => inner.resolve(resolver, interpreter)?,
+            Expr::This(token) => resolver.resolve_local(interpreter, token),
 
             Expr::Call(callee, _paren, arguments) => {
                 callee.resolve(resolver, interpreter)?;
@@ -146,9 +147,27 @@ impl Resolvable for Statement {
                 expr.resolve(resolver, interpreter)?;
                 stmt.resolve(resolver, interpreter)?;
             }
-            Statement::Class(name, _methods) => {
+            Statement::Class(name, methods) => {
                 resolver.declare(name)?;
                 resolver.define(name);
+
+                resolver.begin_scope();
+                resolver
+                    .scopes
+                    .last_mut()
+                    .unwrap()
+                    .insert("this".into(), true);
+
+                for method in methods {
+                    resolver.resolve_funciton(
+                        interpreter,
+                        &method.params,
+                        &method.body,
+                        FunctionType::Method,
+                    )?;
+                }
+
+                resolver.end_scope();
             }
             Statement::Block(block) => block.resolve(resolver, interpreter)?,
             Statement::Return(keyword, value) => {
@@ -185,6 +204,7 @@ impl Resolvable for StatementBlock {
 pub enum FunctionType {
     None,
     Function,
+    Method,
 }
 
 pub struct Resolver {

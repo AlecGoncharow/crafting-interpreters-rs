@@ -22,15 +22,24 @@ pub enum Callable {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Class {
     pub name: String,
+    pub methods: HashMap<String, Function>,
 }
 
 impl Class {
-    pub fn new(name: String) -> Self {
-        Self { name }
+    pub fn new(name: String, methods: HashMap<String, Function>) -> Self {
+        Self { name, methods }
     }
 
-    pub fn new_callable(name: String) -> Callable {
-        Callable::Class(Self::new(name))
+    pub fn new_callable(name: String, methods: HashMap<String, Function>) -> Callable {
+        Callable::Class(Self::new(name, methods))
+    }
+
+    pub fn find_method(&self, name: &str) -> Option<&Function> {
+        if let Some(method) = self.methods.get(name) {
+            Some(method)
+        } else {
+            None
+        }
     }
 }
 
@@ -55,6 +64,10 @@ impl ClassInstance {
     pub fn get(&self, name: &Token) -> RuntimeResult {
         if let Some(value) = self.fields.get(&name.lexeme) {
             Ok(value.clone())
+        } else if let Some(method) = self.class.find_method(&name.lexeme) {
+            Ok(Value::Callable(Callable::Function(
+                method.clone().bind(self),
+            )))
         } else {
             Err(ExecutorError::RuntimeError(
                 name.clone(),
@@ -98,6 +111,17 @@ impl Function {
         closure: Rc<RefCell<Environment>>,
     ) -> Callable {
         Callable::Function(Self::new(name, params, body, closure))
+    }
+
+    pub fn bind(self, instance: &ClassInstance) -> Self {
+        let mut environment = Environment::new_enclosed(self.closure.clone());
+        environment.define("this", instance.clone().into());
+        Self::new(
+            self.name,
+            &self.params,
+            self.body,
+            Rc::new(RefCell::new(environment)),
+        )
     }
 }
 
@@ -253,6 +277,12 @@ impl From<TokenLiteral> for Value {
             TokenLiteral::Continue => Self::Continue,
             TokenLiteral::Break => Self::Break,
         }
+    }
+}
+
+impl From<Function> for Callable {
+    fn from(func: Function) -> Self {
+        Self::Function(func)
     }
 }
 
