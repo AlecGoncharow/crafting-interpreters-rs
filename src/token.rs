@@ -104,6 +104,7 @@ impl PartialEq for TokenLiteral {
             (Self::Number(l), Self::Number(r)) => l == r,
             (Self::Str(l), Self::Str(r)) | (Self::Identifier(l), Self::Identifier(r)) => l == r,
             (Self::Bool(l), Self::Bool(r)) => l == r,
+            (Self::None, Self::None) => true,
             _ => false,
         }
     }

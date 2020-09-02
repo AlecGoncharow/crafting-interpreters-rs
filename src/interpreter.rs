@@ -51,7 +51,10 @@ impl Interpretable for Expr {
             }
             Expr::Binary(inner) => inner.interpret(interpreter, environment),
             Expr::Unary(inner) => inner.interpret(interpreter, environment),
-            Expr::This(token) => interpreter.lookup_variable(token, environment),
+            Expr::This(token) => {
+                //println!("this {:?}", token);
+                interpreter.lookup_variable(token, environment)
+            }
 
             Expr::Call(callee, paren, arguments) => {
                 let mut function = match callee.interpret(interpreter, environment.clone())? {
@@ -85,7 +88,7 @@ impl Interpretable for Expr {
             }
 
             Expr::Get(object, name) => {
-                println!("{:?},", object);
+                //println!("{:?},", object);
                 let object = match object.as_ref() {
                     Expr::Variable(inner) => interpreter.lookup_variable(&inner, environment)?,
                     Expr::Call(_, _, _) => object.interpret(interpreter, environment.clone())?,
@@ -108,6 +111,7 @@ impl Interpretable for Expr {
 
                     _ => object.interpret(interpreter, environment.clone())?,
                 };
+                //println!("resolved: {:?},", object);
 
                 match object {
                     Value::Callable(callable) => match callable {

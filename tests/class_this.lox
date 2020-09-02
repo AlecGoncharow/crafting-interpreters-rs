@@ -3,8 +3,16 @@ class Cake {
     var adjective = "delicious";
     print "The " + this.flavor + " cake is " + adjective + "!";
   }
+
+  test() {
+    return cake.foo;
+  }
 }
 
 var cake = Cake();
 cake.flavor = "German chocolate";
 cake.taste(); // Prints "The German chocolate cake is delicious!".
+cake.foo = 20;
+
+cake.test();
+

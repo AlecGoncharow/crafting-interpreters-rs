@@ -363,7 +363,7 @@ impl Scanner {
         // closing '"'
         self.advance();
 
-        let value = self.source[self.start + 1..self.current - 1].trim();
+        let value = &self.source[self.start + 1..self.current - 1];
         let take = String::from(value);
         self.add_token_with_value(TokenKind::STRING, TokenLiteral::Str(take));
     }

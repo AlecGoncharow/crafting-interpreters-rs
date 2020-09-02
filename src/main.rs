@@ -119,6 +119,12 @@ mod test {
         assert_eq!(run, Value::Str("it works!".into()));
     }
 
+    #[test]
+    fn class_this_works() {
+        let run = run_str("class_this").unwrap();
+        assert_eq!(run, Value::Number(20.0));
+    }
+
     test_ok!(empty_file);
     test_ok!(blocks);
     test_ok!(branch);
