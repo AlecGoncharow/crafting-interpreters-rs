@@ -1,0 +1,9 @@
+class Foo {
+	init(bar) {
+		this.baz = bar;
+	}
+}
+
+var foo = Foo(5);
+print foo.baz;
+

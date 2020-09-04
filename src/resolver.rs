@@ -11,6 +11,7 @@ pub enum ResolveError {
     ScopeError(Token, String),
     Duplicate(Token, String),
     GlobalReturn(Token, String),
+    InitReturn(Token, String),
 }
 
 pub trait Resolvable {
@@ -159,11 +160,17 @@ impl Resolvable for Statement {
                     .insert("this".into(), true);
 
                 for method in methods {
+                    let declaration = if method.name.lexeme == "init" {
+                        FunctionType::Initializer
+                    } else {
+                        FunctionType::Method
+                    };
+
                     resolver.resolve_funciton(
                         interpreter,
                         &method.params,
                         &method.body,
-                        FunctionType::Method,
+                        declaration,
                     )?;
                 }
 
@@ -175,6 +182,13 @@ impl Resolvable for Statement {
                     return Err(ResolveError::GlobalReturn(
                         keyword.clone(),
                         "Cannot return from top-level code.".into(),
+                    ));
+                }
+
+                if resolver.current_fun == FunctionType::Initializer {
+                    return Err(ResolveError::InitReturn(
+                        keyword.clone(),
+                        "Cannot return a value from an initializer.".into(),
                     ));
                 }
 
@@ -205,6 +219,7 @@ pub enum FunctionType {
     None,
     Function,
     Method,
+    Initializer,
 }
 
 pub struct Resolver {

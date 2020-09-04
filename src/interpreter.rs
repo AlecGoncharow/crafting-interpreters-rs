@@ -149,6 +149,7 @@ impl Interpretable for Expr {
                         }
                         out
                     }
+                    Expr::This(this) => (object.interpret(interpreter, environment.clone())?, this),
                     _ => unimplemented!(),
                 };
 
@@ -340,6 +341,7 @@ impl Executable for Statement {
                     &function.params,
                     function.body.clone(),
                     environment.clone(),
+                    false,
                 )
                 .into();
                 environment
@@ -379,6 +381,7 @@ impl Executable for Statement {
                         &method.params,
                         method.body.clone(),
                         environment.clone(),
+                        method.name.lexeme == "init",
                     );
 
                     callable_methods.insert(method.name.lexeme.clone(), function);

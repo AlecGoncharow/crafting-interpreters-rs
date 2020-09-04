@@ -100,7 +100,8 @@ fn run(interpreter: &mut Interpreter, resolver: &mut Resolver, source: &str) -> 
         Err(
             ResolveError::ScopeError(token, msg)
             | ResolveError::Duplicate(token, msg)
-            | ResolveError::GlobalReturn(token, msg),
+            | ResolveError::GlobalReturn(token, msg)
+            | ResolveError::InitReturn(token, msg),
         ) => {
             scanner.lox.error(token.line, &msg);
             return Err(Error::new(ErrorKind::Other, msg));

@@ -57,6 +57,7 @@ impl ClassInstance {
         }
     }
 
+    #[allow(dead_code)]
     pub fn new_callable(class: &Class) -> Callable {
         Callable::ClassInstance(Self::new(class))
     }
@@ -87,6 +88,7 @@ pub struct Function {
     pub params: Vec<Token>,
     pub body: StatementBlock,
     pub closure: Rc<RefCell<Environment>>,
+    pub is_init: bool,
 }
 
 impl Function {
@@ -95,12 +97,14 @@ impl Function {
         params: &[Token],
         body: StatementBlock,
         closure: Rc<RefCell<Environment>>,
+        is_init: bool,
     ) -> Self {
         Self {
             name,
             params: params.into(),
             body,
             closure,
+            is_init,
         }
     }
 
@@ -109,8 +113,9 @@ impl Function {
         params: &[Token],
         body: StatementBlock,
         closure: Rc<RefCell<Environment>>,
+        is_init: bool,
     ) -> Callable {
-        Callable::Function(Self::new(name, params, body, closure))
+        Callable::Function(Self::new(name, params, body, closure, is_init))
     }
 
     pub fn bind(self, instance: &ClassInstance) -> Self {
@@ -121,6 +126,7 @@ impl Function {
             &self.params,
             self.body,
             Rc::new(RefCell::new(environment)),
+            self.is_init,
         )
     }
 }
@@ -156,12 +162,33 @@ impl Callable {
                     );
                 }
 
-                function.body.execute(interpreter, environment)
+                let out = function.body.execute(interpreter, environment)?;
+
+                if function.is_init {
+                    let mut this = Token::none();
+                    this.lexeme = "this".into();
+                    Ok(function.closure.borrow().get_at(0, &this)?.clone())
+                } else {
+                    Ok(out)
+                }
             }
             Self::Class(class) => {
-                let instance = ClassInstance::new_callable(class);
+                let mut instance = ClassInstance::new(class);
+                if let Some(initializer) = class.find_method("init") {
+                    let func = initializer.clone().bind(&instance);
+                    Self::Function(func.clone()).call(interpreter, _environment, args)?;
+                    let mut this = Token::none();
+                    this.lexeme = "this".into();
+                    instance = if let Value::Callable(Callable::ClassInstance(inner)) =
+                        func.closure.clone().borrow().get(&this).unwrap()
+                    {
+                        inner.clone()
+                    } else {
+                        unimplemented!();
+                    };
+                }
 
-                Ok(Value::Callable(instance))
+                Ok(Value::Callable(instance.into()))
             }
             Self::ClassInstance(_instance) => {
                 unimplemented!();
@@ -171,8 +198,15 @@ impl Callable {
 
     pub fn arity(&self) -> usize {
         match self {
-            Self::Clock | Self::Class(_) | Self::ClassInstance(_) => 0,
+            Self::Clock | Self::ClassInstance(_) => 0,
             Self::Function(function) => function.params.len(),
+            Self::Class(class) => {
+                if let Some(initializer) = class.find_method("init") {
+                    initializer.params.len()
+                } else {
+                    0
+                }
+            }
         }
     }
 }
