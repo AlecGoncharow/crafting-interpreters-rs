@@ -176,16 +176,12 @@ impl Callable {
                 let mut instance = ClassInstance::new(class);
                 if let Some(initializer) = class.find_method("init") {
                     let func = initializer.clone().bind(&instance);
-                    Self::Function(func.clone()).call(interpreter, _environment, args)?;
-                    let mut this = Token::none();
-                    this.lexeme = "this".into();
-                    instance = if let Value::Callable(Callable::ClassInstance(inner)) =
-                        func.closure.clone().borrow().get(&this).unwrap()
-                    {
-                        inner.clone()
-                    } else {
-                        unimplemented!();
-                    };
+                    let out = Self::Function(func.clone()).call(interpreter, _environment, args)?;
+
+                    if let Value::Callable(Callable::ClassInstance(inner)) = out {
+                        println!("{:?}", inner.fields);
+                        instance = inner;
+                    }
                 }
 
                 Ok(Value::Callable(instance.into()))

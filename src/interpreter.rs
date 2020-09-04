@@ -111,7 +111,6 @@ impl Interpretable for Expr {
 
                     _ => object.interpret(interpreter, environment.clone())?,
                 };
-                //println!("resolved: {:?},", object);
 
                 match object {
                     Value::Callable(callable) => match callable {
@@ -126,6 +125,7 @@ impl Interpretable for Expr {
             // pushed up to root object. May need smart pointers
             Expr::Set(object, name, value) => {
                 let value = value.interpret(interpreter, environment.clone())?;
+                println!("{:?}", value);
                 let (object, obj_name) = match object.as_ref() {
                     Expr::Variable(inner) => (
                         interpreter.lookup_variable(&inner, environment.clone())?,
@@ -165,7 +165,7 @@ impl Interpretable for Expr {
                     _ => unimplemented!(),
                 };
 
-                //println!("set {:?}", value);
+                println!("set {:?}", obj_name);
                 if let Some(distance) = interpreter.locals.get(&name) {
                     environment.borrow_mut().assign_at(
                         *distance,

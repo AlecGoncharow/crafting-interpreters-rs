@@ -20,12 +20,12 @@ impl Lox {
         Self { has_error: false }
     }
 
-    pub fn error(&mut self, line: usize, msg: &str) {
-        self.report(line, "", msg);
+    pub fn error(&mut self, (row, col): (usize, usize), msg: &str) {
+        self.report((row, col), "", msg);
     }
 
-    pub fn report(&mut self, line: usize, whr: &str, msg: &str) {
-        eprintln!("[line {}] Error {}: {}", line, whr, msg);
+    pub fn report(&mut self, (row, col): (usize, usize), whr: &str, msg: &str) {
+        eprintln!("[line {} column {}] Error {}: {}", row, col, whr, msg);
         self.has_error = true;
     }
 }
@@ -81,7 +81,7 @@ fn run(interpreter: &mut Interpreter, resolver: &mut Resolver, source: &str) -> 
     let stmts = match parser.parse() {
         Ok(expr) => expr,
         Err(ParseError::Mismatch(token, msg) | ParseError::TooManyArgs(token, msg)) => {
-            scanner.lox.error(token.line, &msg);
+            scanner.lox.error((token.line, token.column), &msg);
 
             return Err(Error::new(ErrorKind::Other, msg));
         }
@@ -91,7 +91,7 @@ fn run(interpreter: &mut Interpreter, resolver: &mut Resolver, source: &str) -> 
         let printer = AstPrinter::new();
         let error = printer.print(stmt);
         if let Err(ExecutorError::RuntimeError(token, msg)) = error {
-            scanner.lox.error(token.line, &msg);
+            scanner.lox.error((token.line, token.column), &msg);
         }
     }
 
@@ -103,7 +103,7 @@ fn run(interpreter: &mut Interpreter, resolver: &mut Resolver, source: &str) -> 
             | ResolveError::GlobalReturn(token, msg)
             | ResolveError::InitReturn(token, msg),
         ) => {
-            scanner.lox.error(token.line, &msg);
+            scanner.lox.error((token.line, token.column), &msg);
             return Err(Error::new(ErrorKind::Other, msg));
         }
     }
@@ -111,7 +111,7 @@ fn run(interpreter: &mut Interpreter, resolver: &mut Resolver, source: &str) -> 
     let value = interpreter.interpret(&stmts);
 
     if let Err(ExecutorError::RuntimeError(token, msg)) = value {
-        scanner.lox.error(token.line, &msg);
+        scanner.lox.error((token.line, token.column), &msg);
         return Err(Error::new(ErrorKind::Other, msg));
     }
 
@@ -285,7 +285,9 @@ impl Scanner {
             // identifier
             'a'..='z' | 'A'..='Z' | '_' => self.identifier(),
 
-            _ => self.lox.error(self.line, "Unexpected Character"),
+            _ => self
+                .lox
+                .error((self.line, self.column), "Unexpected Character"),
         };
     }
 
@@ -357,7 +359,8 @@ impl Scanner {
         }
 
         if self.is_at_end() {
-            self.lox.error(self.line, "Unterminated string.");
+            self.lox
+                .error((self.line, self.column), "Unterminated string.");
             return;
         }
 

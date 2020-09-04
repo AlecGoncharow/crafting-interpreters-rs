@@ -5,5 +5,5 @@ class Foo {
 }
 
 var foo = Foo(5);
-print foo.baz;
+print this;
 
