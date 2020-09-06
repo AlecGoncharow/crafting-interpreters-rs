@@ -1,11 +1,18 @@
-use crate::ast::{BinaryExpr, Expr, LogicalExpr, Statement, StatementBlock, UnaryExpr};
-use crate::environment::Environment;
-use crate::token::Token;
-use crate::token::TokenKind;
-use crate::value::{Callable, Class, Function, Value};
+pub use ast::{BinaryExpr, Expr, LogicalExpr, Statement, StatementBlock, UnaryExpr};
+pub use environment::Environment;
+pub use token::Token;
+pub use token::TokenKind;
+pub use value::{Callable, Class, Function, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+
+pub mod ast;
+pub mod environment;
+pub mod parser;
+pub mod resolver;
+pub mod token;
+pub mod value;
 
 #[derive(Debug)]
 pub enum ExecutorError {

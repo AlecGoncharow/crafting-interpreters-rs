@@ -1,11 +1,11 @@
-use crate::ast::StatementBlock;
-use crate::environment::Environment;
+use crate::interpreter::ast::StatementBlock;
+use crate::interpreter::environment::Environment;
 use crate::interpreter::Executable;
 use crate::interpreter::ExecutorError;
 use crate::interpreter::Interpreter;
 use crate::interpreter::RuntimeResult;
-use crate::token::Token;
-use crate::token::TokenLiteral;
+use super::token::Token;
+use super::token::TokenLiteral;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;

@@ -1,4 +1,4 @@
-use crate::ast::{Expr, Statement};
+use crate::interpreter::ast::{Expr, Statement};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 

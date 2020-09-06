@@ -1,14 +1,9 @@
 #![feature(or_patterns)]
 #![feature(nll)]
 
-mod ast;
-mod environment;
 mod interpreter;
 mod lox;
-mod parser;
-mod resolver;
-mod token;
-mod value;
+
 
 use std::env;
 use std::io;
@@ -32,7 +27,7 @@ fn main() -> io::Result<()> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use value::Value;
+    use super::interpreter::value::Value;
     static PROJECT_PATH: &'static str = env!("CARGO_MANIFEST_DIR");
     static TESTS_PATH: &'static str = "/tests/";
 

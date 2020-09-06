@@ -1,5 +1,5 @@
-use crate::interpreter::ExecutorError;
-use crate::token::{Token, TokenLiteral};
+use super::ExecutorError;
+use super::token::{Token, TokenLiteral};
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Expr {

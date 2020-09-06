@@ -1,7 +1,7 @@
-use crate::ast::{BinaryExpr, Expr, LogicalExpr, Statement, StatementBlock, UnaryExpr};
-use crate::interpreter::Interpreter;
-use crate::token::Token;
-use crate::token::TokenLiteral;
+use crate::interpreter::ast::{BinaryExpr, Expr, LogicalExpr, Statement, StatementBlock, UnaryExpr};
+use super::Interpreter;
+use super::token::Token;
+use super::token::TokenLiteral;
 use std::collections::HashMap;
 
 // @TODO @CHALLENGE Extend the resolver to report an error if a local variable is never used.
