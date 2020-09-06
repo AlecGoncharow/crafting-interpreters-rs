@@ -1,15 +1,44 @@
 #![feature(or_patterns)]
 #![feature(nll)]
 
+mod compiler;
 mod interpreter;
 mod lox;
+mod vm;
 
-
+use compiler::chunk::{Chunk, OpCode};
+use compiler::debug::disassemble_chunk;
 use std::env;
 use std::io;
 use std::io::{Error, ErrorKind};
+use vm::VirtualMachine;
 
 fn main() -> io::Result<()> {
+    let mut vm = VirtualMachine::init();
+    let mut chunk = Chunk::init();
+    let constant = chunk.add_constant(1.2);
+    chunk.write_op(OpCode::Constant);
+    chunk.write(constant);
+
+    chunk.write_op(OpCode::Negate);
+
+    let constant = chunk.add_constant(3.4);
+    chunk.write_op(OpCode::Constant);
+    chunk.write(constant);
+
+    chunk.write_op(OpCode::Add);
+
+    let constant = chunk.add_constant(5.6);
+    chunk.write_op(OpCode::Constant);
+    chunk.write(constant);
+
+    chunk.write_op(OpCode::Divide);
+
+    chunk.write_op(OpCode::Return);
+
+    println!("{:?}", vm.interpret(chunk));
+
+    /*
     let args = env::args();
     match args.len() {
         1 => {
@@ -21,13 +50,14 @@ fn main() -> io::Result<()> {
         }
         _ => return Err(Error::new(ErrorKind::Other, "Usage: Foo [script]")),
     };
+    */
     Ok(())
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use super::interpreter::value::Value;
+    use super::*;
     static PROJECT_PATH: &'static str = env!("CARGO_MANIFEST_DIR");
     static TESTS_PATH: &'static str = "/tests/";
 
