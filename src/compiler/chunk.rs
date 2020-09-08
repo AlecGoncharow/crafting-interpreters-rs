@@ -128,7 +128,7 @@ impl Chunk {
         }
     }
 
-    pub fn write(&mut self, code: u8) {
+    pub fn write(&mut self, code: u8, location: (usize, usize)) {
         if self.capacity < self.count + 1 {
             let old = self.capacity;
             self.capacity = grow_capacity!(old);
@@ -136,12 +136,15 @@ impl Chunk {
             self.locations.resize_with(self.capacity, Default::default);
         }
         self.code[self.count] = code;
-        self.locations[self.count] = Default::default();
+        self.locations[self.count] = Location {
+            line: location.0,
+            col: location.1,
+        };
         self.count += 1;
     }
 
-    pub fn write_op(&mut self, op: OpCode) {
-        self.write(op as u8)
+    pub fn write_op(&mut self, op: OpCode, location: (usize, usize)) {
+        self.write(op as u8, location)
     }
 
     pub fn add_constant(&mut self, value: Value) -> u8 {

@@ -16,6 +16,7 @@ use vm::VirtualMachine;
 fn main() -> io::Result<()> {
     let mut vm = VirtualMachine::init();
     let mut chunk = Chunk::init();
+    /*
     let constant = chunk.add_constant(1.2);
     chunk.write_op(OpCode::Constant);
     chunk.write(constant);
@@ -35,6 +36,7 @@ fn main() -> io::Result<()> {
     chunk.write_op(OpCode::Divide);
 
     chunk.write_op(OpCode::Return);
+    */
 
     println!("{:?}", vm.interpret(chunk));
 
