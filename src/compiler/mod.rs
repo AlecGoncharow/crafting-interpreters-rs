@@ -6,24 +6,29 @@ pub mod value;
 
 use crate::vm::InterpretError;
 use chunk::{Chunk, OpCode};
+use debug::disassemble_chunk;
 use scanner::Scanner;
 use token::{Token, TokenKind};
 use value::Value;
 
-pub fn compile(source: &str, chunk: Chunk) -> bool {
+pub fn compile(source: &str) -> Result<Chunk, InterpretError> {
     let mut scanner = Scanner::new(source);
     let tokens = scanner.scan_tokens();
     let mut parser = Parser::new(tokens);
 
-    parser.consume(TokenKind::EOF, "Expect end of expression.");
-    !parser.had_error
+    parser.expression()?;
+    parser.consume(TokenKind::EOF, "Expect end of expression.")?;
+    parser.end();
+
+    Ok(parser.current_chunk)
 }
 
+#[derive(PartialOrd, PartialEq)]
 pub enum Precedence {
     NONE = 0,
     ASSIGNMENT = 1, // =
-    OR = 2,         // or
-    AND = 3,        // and
+    OR = 2,         // OR
+    AND = 3,        // AND
     EQUALITY = 4,   // == !=
     COMPARISON = 5, // < > <= >=
     TERM = 6,       // + -
@@ -33,17 +38,52 @@ pub enum Precedence {
     PRIMARY = 10,
 }
 
+impl From<u8> for Precedence {
+    fn from(byte: u8) -> Self {
+        match byte {
+            0 => Self::NONE,
+            1 => Self::ASSIGNMENT,
+            2 => Self::OR,
+            3 => Self::AND,
+            4 => Self::EQUALITY,
+            5 => Self::COMPARISON,
+            6 => Self::TERM,
+            7 => Self::FACTOR,
+            8 => Self::UNARY,
+            9 => Self::CALL,
+            10 => Self::PRIMARY,
+            _ => unreachable!(),
+        }
+    }
+}
+
 type ParseResult = Result<(), InterpretError>;
 
-enum RuleFn {
+enum ParseFn {
     Grouping,
     Unary,
     Binary,
     Number,
 }
 
-// (Left_Op, Right_Op, Level)
-type Rule = (Option<RuleFn>, Option<RuleFn>, Precedence);
+// (Prefix, Infix, precedence of infix)
+type Rule = (Option<ParseFn>, Option<ParseFn>, Precedence);
+
+struct ParseRule {
+    prefix: Option<ParseFn>,
+    infix: Option<ParseFn>,
+    precedence: Precedence,
+}
+
+impl From<Rule> for ParseRule {
+    fn from(rule: Rule) -> Self {
+        Self {
+            prefix: rule.0,
+            infix: rule.1,
+            precedence: rule.2,
+        }
+    }
+}
 
 struct Parser {
     current: usize,
@@ -53,19 +93,23 @@ struct Parser {
     current_chunk: Chunk,
 }
 
-fn map_rule(token: TokenKind) -> Rule {
+fn rule(token: TokenKind) -> ParseRule {
     match token {
-        TokenKind::LEFT_PAREN => (Some(RuleFn::Grouping), None, Precedence::NONE),
+        TokenKind::LEFT_PAREN => (Some(ParseFn::Grouping), None, Precedence::NONE),
         TokenKind::RIGHT_PAREN => (None, None, Precedence::NONE),
         TokenKind::LEFT_BRACE => (None, None, Precedence::NONE),
         TokenKind::RIGHT_BRACE => (None, None, Precedence::NONE),
         TokenKind::COMMA => (None, None, Precedence::NONE),
         TokenKind::DOT => (None, None, Precedence::NONE),
-        TokenKind::MINUS => (Some(RuleFn::Unary), Some(RuleFn::Binary), Precedence::TERM),
-        TokenKind::PLUS => (None, Some(RuleFn::Binary), Precedence::TERM),
+        TokenKind::MINUS => (
+            Some(ParseFn::Unary),
+            Some(ParseFn::Binary),
+            Precedence::TERM,
+        ),
+        TokenKind::PLUS => (None, Some(ParseFn::Binary), Precedence::TERM),
         TokenKind::SEMICOLON => (None, None, Precedence::NONE),
-        TokenKind::SLASH => (None, Some(RuleFn::Binary), Precedence::FACTOR),
-        TokenKind::STAR => (None, Some(RuleFn::Binary), Precedence::FACTOR),
+        TokenKind::SLASH => (None, Some(ParseFn::Binary), Precedence::FACTOR),
+        TokenKind::STAR => (None, Some(ParseFn::Binary), Precedence::FACTOR),
         TokenKind::BANG => (None, None, Precedence::NONE),
         TokenKind::BANG_EQUAL => (None, None, Precedence::NONE),
         TokenKind::EQUAL => (None, None, Precedence::NONE),
@@ -76,7 +120,7 @@ fn map_rule(token: TokenKind) -> Rule {
         TokenKind::LESS_EQUAL => (None, None, Precedence::NONE),
         TokenKind::IDENTIFIER => (None, None, Precedence::NONE),
         TokenKind::STRING => (None, None, Precedence::NONE),
-        TokenKind::NUMBER => (Some(RuleFn::Number), None, Precedence::NONE),
+        TokenKind::NUMBER => (Some(ParseFn::Number), None, Precedence::NONE),
         TokenKind::AND => (None, None, Precedence::NONE),
         TokenKind::CLASS => (None, None, Precedence::NONE),
         TokenKind::ELSE => (None, None, Precedence::NONE),
@@ -98,6 +142,7 @@ fn map_rule(token: TokenKind) -> Rule {
         TokenKind::BREAK => (None, None, Precedence::NONE),
         TokenKind::CONTINUE => (None, None, Precedence::NONE),
     }
+    .into()
 }
 
 impl Parser {
@@ -115,6 +160,7 @@ impl Parser {
         loop {
             let token = self.current_token();
             if token.kind != TokenKind::ERROR {
+                self.current += 1;
                 return Ok(());
             }
 
@@ -198,6 +244,10 @@ impl Parser {
 
     fn end(&mut self) {
         self.emit_return();
+
+        if !self.had_error {
+            disassemble_chunk(&self.current_chunk, "code");
+        }
     }
 
     fn emit_return(&mut self) {
@@ -205,30 +255,46 @@ impl Parser {
     }
 
     // === Expr Parser
-    fn expression(&mut self) {
-        self.parse_precedence(Precedence::NONE);
+    fn expression(&mut self) -> ParseResult {
+        self.parse_precedence(Precedence::ASSIGNMENT)
     }
 
-    fn parse_precedence(&mut self, precedence: Precedence) {
-        unimplemented!()
+    fn parse_precedence(&mut self, precedence: Precedence) -> ParseResult {
+        self.advance()?;
+
+        if let Some(fun) = rule(self.previous_token().kind).prefix {
+            self.parse_fn(fun)?;
+        } else {
+            self.error("Expect expression.");
+            return Err(InterpretError::CompileError);
+        }
+
+        while precedence <= rule(self.current_token().kind).precedence {
+            self.advance()?;
+            if let Some(fun) = rule(self.previous_token().kind).infix {
+                self.parse_fn(fun)?;
+            }
+        }
+        Ok(())
     }
 
     // === Token  Parser
 
-    fn number(&mut self) {
+    fn number(&mut self) -> ParseResult {
         let value = self.previous_token().lexeme.parse::<f64>().unwrap();
         self.emit_constant(value);
+        Ok(())
     }
 
     fn grouping(&mut self) -> ParseResult {
-        self.expression();
+        self.expression()?;
         self.consume(TokenKind::RIGHT_PAREN, "Expect ')' after expression.")
     }
 
     fn unary(&mut self) -> ParseResult {
         let op_kind = self.previous_token().kind;
 
-        self.parse_precedence(Precedence::UNARY);
+        self.parse_precedence(Precedence::UNARY)?;
 
         match op_kind {
             TokenKind::MINUS => self.emit_op(OpCode::Negate),
@@ -240,6 +306,18 @@ impl Parser {
 
     fn binary(&mut self) -> ParseResult {
         let op_kind = self.previous_token().kind;
+
+        let rule = rule(op_kind);
+        self.parse_precedence(Precedence::from(rule.precedence as u8 + 1))?;
+
+        match op_kind {
+            TokenKind::PLUS => self.emit_op(OpCode::Add),
+            TokenKind::MINUS => self.emit_op(OpCode::Subtract),
+            TokenKind::STAR => self.emit_op(OpCode::Multiply),
+            TokenKind::SLASH => self.emit_op(OpCode::Divide),
+
+            _ => unreachable!(),
+        }
 
         Ok(())
     }
@@ -253,5 +331,14 @@ impl Parser {
     #[inline(always)]
     fn previous_token(&self) -> &Token {
         &self.tokens[self.current - 1]
+    }
+
+    fn parse_fn(&mut self, fun: ParseFn) -> ParseResult {
+        match fun {
+            ParseFn::Number => self.number(),
+            ParseFn::Unary => self.unary(),
+            ParseFn::Binary => self.binary(),
+            ParseFn::Grouping => self.grouping(),
+        }
     }
 }

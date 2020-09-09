@@ -118,6 +118,7 @@ impl Chunk {
         }
     }
 
+    #[allow(dead_code)]
     pub fn new(capacity: usize) -> Self {
         Self {
             count: 0,
@@ -143,6 +144,7 @@ impl Chunk {
         self.count += 1;
     }
 
+    #[allow(dead_code)]
     pub fn write_op(&mut self, op: OpCode, location: (usize, usize)) {
         self.write(op as u8, location)
     }
@@ -152,5 +154,6 @@ impl Chunk {
         self.constants.count as u8 - 1
     }
 
+    #[allow(dead_code)]
     pub fn free(self) {}
 }

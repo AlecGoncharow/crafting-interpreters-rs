@@ -43,6 +43,4 @@ impl ValueArray {
         self.values[self.count] = values;
         self.count += 1;
     }
-
-    pub fn free(self) {}
 }

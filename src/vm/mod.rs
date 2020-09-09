@@ -1,6 +1,7 @@
 use crate::compiler;
 use compiler::chunk::{Chunk, OpCode};
-use compiler::debug::{disassemble_instruction, print_value};
+use compiler::compile;
+use compiler::debug::disassemble_instruction;
 use compiler::value::Value;
 
 pub const STACK_MAX: usize = 256;
@@ -11,7 +12,7 @@ pub enum InterpretError {
     RuntimeError,
 }
 
-pub type InterpretResult = Result<(), InterpretError>;
+pub type InterpretResult = Result<Value, InterpretError>;
 
 pub struct VirtualMachine {
     chunk: Chunk,
@@ -42,8 +43,13 @@ impl VirtualMachine {
         self.stack[self.stack_top]
     }
 
-    pub fn interpret(&mut self, chunk: Chunk) -> InterpretResult {
-        self.chunk = chunk;
+    pub fn interpret(&mut self, source: &str) -> InterpretResult {
+        self.chunk = if let Ok(chunk) = compile(source) {
+            chunk
+        } else {
+            return Err(InterpretError::CompileError);
+        };
+
         self.ip = 0;
         self.run()
     }
@@ -78,9 +84,8 @@ impl VirtualMachine {
 
             match instruction {
                 OpCode::Return => {
-                    print_value(self.pop());
-                    println!();
-                    return Ok(());
+                    let pop = self.pop();
+                    return Ok(pop);
                 }
                 OpCode::Constant => {
                     let constant = read_constant!();
@@ -97,8 +102,6 @@ impl VirtualMachine {
                 _ => unimplemented!(),
             }
         }
-
-        Ok(())
     }
 
     pub fn free(self) {}

@@ -6,16 +6,40 @@ mod interpreter;
 mod lox;
 mod vm;
 
-use compiler::chunk::{Chunk, OpCode};
-use compiler::debug::disassemble_chunk;
+use compiler::value::Value;
+use lox::simple_write;
 use std::env;
+use std::fs;
 use std::io;
 use std::io::{Error, ErrorKind};
 use vm::VirtualMachine;
 
+fn repl(vm: &mut VirtualMachine) -> io::Result<()> {
+    loop {
+        simple_write("> ")?;
+
+        let mut input = String::new();
+        let value = match io::stdin().read_line(&mut input) {
+            Ok(_) => match vm.interpret(&input) {
+                Ok(v) => v,
+                Err(_) => -1.0,
+            },
+            Err(e) => {
+                eprintln!("{}", e);
+                -1.0
+            }
+        };
+        println!("{:?}", value);
+    }
+}
+
+pub fn run_file(vm: &mut VirtualMachine, path: &str) -> io::Result<Value> {
+    let bytes = fs::read(path)?;
+    Ok(vm.interpret(&String::from_utf8(bytes).unwrap()).unwrap())
+}
+
 fn main() -> io::Result<()> {
     let mut vm = VirtualMachine::init();
-    let mut chunk = Chunk::init();
     /*
     let constant = chunk.add_constant(1.2);
     chunk.write_op(OpCode::Constant);
@@ -38,26 +62,32 @@ fn main() -> io::Result<()> {
     chunk.write_op(OpCode::Return);
     */
 
-    println!("{:?}", vm.interpret(chunk));
+    let use_vm = true;
 
-    /*
     let args = env::args();
     match args.len() {
         1 => {
-            lox::run_prompt()?;
+            if use_vm {
+                repl(&mut vm)?;
+            } else {
+                lox::run_prompt()?;
+            }
         }
         2 => {
             let path = args.last().expect("what");
-            println!("{:?}", lox::run_file(&path));
+            if use_vm {
+                println!("{:?}", run_file(&mut vm, &path));
+            } else {
+                println!("{:?}", lox::run_file(&path));
+            }
         }
         _ => return Err(Error::new(ErrorKind::Other, "Usage: Foo [script]")),
     };
-    */
     Ok(())
 }
 
 #[cfg(test)]
-mod test {
+mod test_interpreter {
     use super::interpreter::value::Value;
     use super::*;
     static PROJECT_PATH: &'static str = env!("CARGO_MANIFEST_DIR");

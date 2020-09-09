@@ -71,6 +71,7 @@ impl Token {
         }
     }
 
+    #[allow(dead_code)]
     pub fn none() -> Self {
         Self {
             kind: TokenKind::NIL,

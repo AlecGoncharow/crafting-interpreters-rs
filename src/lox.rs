@@ -1,10 +1,10 @@
 use crate::interpreter::ast::AstPrinter;
-use crate::interpreter::ExecutorError;
-use crate::interpreter::Interpreter;
 use crate::interpreter::parser::{ParseError, Parser};
 use crate::interpreter::resolver::ResolveError;
 use crate::interpreter::resolver::Resolver;
 use crate::interpreter::token::{Token, TokenKind, TokenLiteral};
+use crate::interpreter::ExecutorError;
+use crate::interpreter::Interpreter;
 use crate::interpreter::Value;
 use std::fs;
 use std::io;
@@ -30,7 +30,7 @@ impl Lox {
     }
 }
 
-fn simple_write(s: &str) -> io::Result<()> {
+pub fn simple_write(s: &str) -> io::Result<()> {
     let stdout = io::stdout();
     let lock = stdout.lock();
     let mut w = io::BufWriter::new(lock);
