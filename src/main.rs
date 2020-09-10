@@ -22,11 +22,11 @@ fn repl(vm: &mut VirtualMachine) -> io::Result<()> {
         let value = match io::stdin().read_line(&mut input) {
             Ok(_) => match vm.interpret(&input) {
                 Ok(v) => v,
-                Err(_) => -1.0,
+                Err(_) => Default::default(),
             },
             Err(e) => {
                 eprintln!("{}", e);
-                -1.0
+                Default::default()
             }
         };
         println!("{:?}", value);

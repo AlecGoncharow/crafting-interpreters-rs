@@ -13,19 +13,25 @@ pub enum OpCode {
     Multiply = 5,
     Divide = 6,
 
+    Nil = 7,
+    True = 8,
+    False = 9,
+
     Nop = 255,
 }
 
 impl OpCode {
     pub fn apply_binary(&self, left: Value, right: Value) -> Value {
-        match self {
+        let left = left.number().unwrap();
+        let right = right.number().unwrap();
+        Value::Number(match self {
             Self::Add => left + right,
             Self::Subtract => left - right,
             Self::Multiply => left * right,
             Self::Divide => left / right,
 
             _ => unreachable!(),
-        }
+        })
     }
 }
 
@@ -40,6 +46,10 @@ impl From<u8> for OpCode {
             4 => Self::Subtract,
             5 => Self::Multiply,
             6 => Self::Divide,
+
+            7 => Self::Nil,
+            8 => Self::True,
+            9 => Self::False,
 
             255 => Self::Nop,
             _ => unimplemented!(),
@@ -64,6 +74,10 @@ impl Display for OpCode {
             OpCode::Subtract => write!(f, "OP_SUBTRACT"),
             OpCode::Multiply => write!(f, "OP_MULTIPLY"),
             OpCode::Divide => write!(f, "OP_DIVIDE"),
+
+            OpCode::Nil => write!(f, "OP_NIL"),
+            OpCode::True => write!(f, "OP_TRUE"),
+            OpCode::False => write!(f, "OP_FALSE"),
         }
     }
 }

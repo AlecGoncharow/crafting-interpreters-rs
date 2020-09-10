@@ -64,6 +64,7 @@ enum ParseFn {
     Unary,
     Binary,
     Number,
+    Literal,
 }
 
 // (Prefix, Infix, precedence of infix)
@@ -83,14 +84,6 @@ impl From<Rule> for ParseRule {
             precedence: rule.2,
         }
     }
-}
-
-struct Parser {
-    current: usize,
-    tokens: Vec<Token>,
-    had_error: bool,
-    panic_mode: bool,
-    current_chunk: Chunk,
 }
 
 fn rule(token: TokenKind) -> ParseRule {
@@ -124,17 +117,17 @@ fn rule(token: TokenKind) -> ParseRule {
         TokenKind::AND => (None, None, Precedence::NONE),
         TokenKind::CLASS => (None, None, Precedence::NONE),
         TokenKind::ELSE => (None, None, Precedence::NONE),
-        TokenKind::FALSE => (None, None, Precedence::NONE),
+        TokenKind::FALSE => (Some(ParseFn::Literal), None, Precedence::NONE),
         TokenKind::FOR => (None, None, Precedence::NONE),
         TokenKind::FUN => (None, None, Precedence::NONE),
         TokenKind::IF => (None, None, Precedence::NONE),
-        TokenKind::NIL => (None, None, Precedence::NONE),
+        TokenKind::NIL => (Some(ParseFn::Literal), None, Precedence::NONE),
         TokenKind::OR => (None, None, Precedence::NONE),
         TokenKind::PRINT => (None, None, Precedence::NONE),
         TokenKind::RETURN => (None, None, Precedence::NONE),
         TokenKind::SUPER => (None, None, Precedence::NONE),
         TokenKind::THIS => (None, None, Precedence::NONE),
-        TokenKind::TRUE => (None, None, Precedence::NONE),
+        TokenKind::TRUE => (Some(ParseFn::Literal), None, Precedence::NONE),
         TokenKind::VAR => (None, None, Precedence::NONE),
         TokenKind::WHILE => (None, None, Precedence::NONE),
         TokenKind::ERROR => (None, None, Precedence::NONE),
@@ -145,6 +138,15 @@ fn rule(token: TokenKind) -> ParseRule {
     .into()
 }
 
+struct Parser {
+    current: usize,
+    tokens: Vec<Token>,
+    had_error: bool,
+    panic_mode: bool,
+    debug: bool,
+    current_chunk: Chunk,
+}
+
 impl Parser {
     pub fn new(tokens: &[Token]) -> Self {
         Self {
@@ -152,6 +154,7 @@ impl Parser {
             tokens: tokens.into(),
             had_error: false,
             panic_mode: false,
+            debug: true,
             current_chunk: Chunk::init(),
         }
     }
@@ -184,7 +187,7 @@ impl Parser {
         }
         self.panic_mode = true;
 
-        eprint!("[line {}] Error", token.line);
+        eprint!("[line {}, col: {}] Error", token.line, token.column);
 
         match token.kind {
             TokenKind::EOF => {
@@ -245,7 +248,7 @@ impl Parser {
     fn end(&mut self) {
         self.emit_return();
 
-        if !self.had_error {
+        if self.debug && !self.had_error {
             disassemble_chunk(&self.current_chunk, "code");
         }
     }
@@ -282,7 +285,7 @@ impl Parser {
 
     fn number(&mut self) -> ParseResult {
         let value = self.previous_token().lexeme.parse::<f64>().unwrap();
-        self.emit_constant(value);
+        self.emit_constant(value.into());
         Ok(())
     }
 
@@ -322,6 +325,17 @@ impl Parser {
         Ok(())
     }
 
+    fn literal(&mut self) -> ParseResult {
+        match self.previous_token().kind {
+            TokenKind::FALSE => self.emit_op(OpCode::False),
+            TokenKind::TRUE => self.emit_op(OpCode::True),
+            TokenKind::NIL => self.emit_op(OpCode::Nil),
+
+            _ => unreachable!(),
+        }
+        Ok(())
+    }
+
     // helpers
     #[inline(always)]
     fn current_token(&self) -> &Token {
@@ -339,6 +353,7 @@ impl Parser {
             ParseFn::Unary => self.unary(),
             ParseFn::Binary => self.binary(),
             ParseFn::Grouping => self.grouping(),
+            ParseFn::Literal => self.literal(),
         }
     }
 }

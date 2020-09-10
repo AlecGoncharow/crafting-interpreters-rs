@@ -27,10 +27,14 @@ impl VirtualMachine {
         Self {
             chunk: Chunk::init(),
             ip: 0,
-            stack: [0.0; STACK_MAX],
+            stack: [Default::default(); STACK_MAX],
             stack_top: 0,
             debug: true,
         }
+    }
+
+    pub fn reset_stack(&mut self) {
+        self.stack_top = 0;
     }
 
     pub fn push(&mut self, value: Value) {
@@ -41,6 +45,10 @@ impl VirtualMachine {
     pub fn pop(&mut self) -> Value {
         self.stack_top -= 1;
         self.stack[self.stack_top]
+    }
+
+    pub fn peek(&self, distance: usize) -> &Value {
+        &self.stack[self.stack_top - (1 + distance)]
     }
 
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
@@ -91,8 +99,17 @@ impl VirtualMachine {
                     let constant = read_constant!();
                     self.push(constant);
                 }
+                OpCode::Nil => self.push(Value::Nil),
+                OpCode::True => self.push(Value::Bool(true)),
+                OpCode::False => self.push(Value::Bool(false)),
+
                 OpCode::Negate => {
-                    self.stack[self.stack_top - 1] = -self.stack[self.stack_top - 1];
+                    if let Some(number) = self.peek(0).number() {
+                        self.stack[self.stack_top - 1] = Value::Number(-number)
+                    } else {
+                        self.runtime_error("Operand must be a number.");
+                        return Err(InterpretError::RuntimeError);
+                    }
                 }
                 OpCode::Add | OpCode::Subtract | OpCode::Multiply | OpCode::Divide => {
                     let right = self.pop();
@@ -102,6 +119,17 @@ impl VirtualMachine {
                 _ => unimplemented!(),
             }
         }
+    }
+
+    fn runtime_error(&mut self, msg: &str) {
+        println!("{}", msg);
+
+        let instruction = self.ip - 1;
+        let location = self.chunk.locations[instruction];
+
+        eprintln!("[line: {}, col: {}] in script", location.line, location.col);
+
+        self.reset_stack();
     }
 
     pub fn free(self) {}
