@@ -2,7 +2,7 @@ use super::value::{Value, ValueArray};
 use fmt::{Display, Formatter};
 use std::fmt;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq)]
 pub enum OpCode {
     Constant = 0,
     Return = 1,
@@ -17,6 +17,11 @@ pub enum OpCode {
     True = 8,
     False = 9,
 
+    Not = 10,
+    Equal = 11,
+    Greater = 12,
+    Less = 13,
+
     Nop = 255,
 }
 
@@ -24,14 +29,23 @@ impl OpCode {
     pub fn apply_binary(&self, left: Value, right: Value) -> Value {
         let left = left.number().unwrap();
         let right = right.number().unwrap();
-        Value::Number(match self {
-            Self::Add => left + right,
-            Self::Subtract => left - right,
-            Self::Multiply => left * right,
-            Self::Divide => left / right,
+        if self == &Self::Greater || self == &Self::Less {
+            Value::Bool(match self {
+                Self::Greater => left > right,
+                Self::Less => left < right,
 
-            _ => unreachable!(),
-        })
+                _ => unreachable!(),
+            })
+        } else {
+            Value::Number(match self {
+                Self::Add => left + right,
+                Self::Subtract => left - right,
+                Self::Multiply => left * right,
+                Self::Divide => left / right,
+
+                _ => unreachable!(),
+            })
+        }
     }
 }
 
@@ -50,6 +64,11 @@ impl From<u8> for OpCode {
             7 => Self::Nil,
             8 => Self::True,
             9 => Self::False,
+
+            10 => Self::Not,
+            11 => Self::Equal,
+            12 => Self::Greater,
+            13 => Self::Less,
 
             255 => Self::Nop,
             _ => unimplemented!(),
@@ -78,6 +97,10 @@ impl Display for OpCode {
             OpCode::Nil => write!(f, "OP_NIL"),
             OpCode::True => write!(f, "OP_TRUE"),
             OpCode::False => write!(f, "OP_FALSE"),
+            Self::Not => write!(f, "OP_NOT"),
+            Self::Equal => write!(f, "OP_EQ"),
+            Self::Greater => write!(f, "OP_GREATER"),
+            Self::Less => write!(f, "OP_LESS"),
         }
     }
 }

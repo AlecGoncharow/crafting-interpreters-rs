@@ -23,6 +23,26 @@ impl Value {
             _ => true,
         }
     }
+
+    pub fn is_falsey(&self) -> bool {
+        match self {
+            Self::Bool(b) => !*b,
+            Self::Nil => true,
+            _ => false,
+        }
+    }
+}
+
+impl std::cmp::PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Value::Bool(l), Value::Bool(r)) => l == r,
+            (Value::Number(l), Value::Number(r)) => l == r,
+            (Value::Nil, Value::Nil) => true,
+
+            _ => false,
+        }
+    }
 }
 
 impl fmt::Display for Value {

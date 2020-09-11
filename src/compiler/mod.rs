@@ -103,14 +103,14 @@ fn rule(token: TokenKind) -> ParseRule {
         TokenKind::SEMICOLON => (None, None, Precedence::NONE),
         TokenKind::SLASH => (None, Some(ParseFn::Binary), Precedence::FACTOR),
         TokenKind::STAR => (None, Some(ParseFn::Binary), Precedence::FACTOR),
-        TokenKind::BANG => (None, None, Precedence::NONE),
-        TokenKind::BANG_EQUAL => (None, None, Precedence::NONE),
+        TokenKind::BANG => (Some(ParseFn::Unary), None, Precedence::NONE),
+        TokenKind::BANG_EQUAL => (None, Some(ParseFn::Binary), Precedence::EQUALITY),
         TokenKind::EQUAL => (None, None, Precedence::NONE),
-        TokenKind::EQUAL_EQUAL => (None, None, Precedence::NONE),
-        TokenKind::GREATER => (None, None, Precedence::NONE),
-        TokenKind::GREATER_EQUAL => (None, None, Precedence::NONE),
-        TokenKind::LESS => (None, None, Precedence::NONE),
-        TokenKind::LESS_EQUAL => (None, None, Precedence::NONE),
+        TokenKind::EQUAL_EQUAL => (None, Some(ParseFn::Binary), Precedence::EQUALITY),
+        TokenKind::GREATER => (None, Some(ParseFn::Binary), Precedence::COMPARISON),
+        TokenKind::GREATER_EQUAL => (None, Some(ParseFn::Binary), Precedence::COMPARISON),
+        TokenKind::LESS => (None, Some(ParseFn::Binary), Precedence::COMPARISON),
+        TokenKind::LESS_EQUAL => (None, Some(ParseFn::Binary), Precedence::COMPARISON),
         TokenKind::IDENTIFIER => (None, None, Precedence::NONE),
         TokenKind::STRING => (None, None, Precedence::NONE),
         TokenKind::NUMBER => (Some(ParseFn::Number), None, Precedence::NONE),
@@ -301,6 +301,7 @@ impl Parser {
 
         match op_kind {
             TokenKind::MINUS => self.emit_op(OpCode::Negate),
+            TokenKind::BANG => self.emit_op(OpCode::Not),
             _ => unreachable!(),
         }
 
@@ -318,6 +319,24 @@ impl Parser {
             TokenKind::MINUS => self.emit_op(OpCode::Subtract),
             TokenKind::STAR => self.emit_op(OpCode::Multiply),
             TokenKind::SLASH => self.emit_op(OpCode::Divide),
+
+            TokenKind::EQUAL_EQUAL => self.emit_op(OpCode::Equal),
+            TokenKind::GREATER => self.emit_op(OpCode::Greater),
+            TokenKind::LESS => self.emit_op(OpCode::Less),
+
+            TokenKind::GREATER_EQUAL => {
+                self.emit_op(OpCode::Less);
+                self.emit_op(OpCode::Not);
+            }
+            TokenKind::LESS_EQUAL => {
+                self.emit_op(OpCode::Greater);
+                self.emit_op(OpCode::Not);
+            }
+
+            TokenKind::BANG_EQUAL => {
+                self.emit_op(OpCode::Equal);
+                self.emit_op(OpCode::Not);
+            }
 
             _ => unreachable!(),
         }

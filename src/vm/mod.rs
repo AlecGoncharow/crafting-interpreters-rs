@@ -99,6 +99,7 @@ impl VirtualMachine {
                     let constant = read_constant!();
                     self.push(constant);
                 }
+
                 OpCode::Nil => self.push(Value::Nil),
                 OpCode::True => self.push(Value::Bool(true)),
                 OpCode::False => self.push(Value::Bool(false)),
@@ -111,7 +112,25 @@ impl VirtualMachine {
                         return Err(InterpretError::RuntimeError);
                     }
                 }
-                OpCode::Add | OpCode::Subtract | OpCode::Multiply | OpCode::Divide => {
+
+                OpCode::Not => {
+                    self.stack[self.stack_top - 1] =
+                        self.stack[self.stack_top - 1].is_falsey().into()
+                }
+
+                OpCode::Equal => {
+                    let b = self.pop();
+                    let a = self.pop();
+
+                    self.push(Value::Bool(a == b))
+                }
+
+                OpCode::Add
+                | OpCode::Subtract
+                | OpCode::Multiply
+                | OpCode::Divide
+                | OpCode::Greater
+                | OpCode::Less => {
                     let right = self.pop();
                     let left = self.pop();
                     self.push(instruction.apply_binary(left, right));
