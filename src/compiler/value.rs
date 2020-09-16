@@ -1,21 +1,24 @@
 use std::fmt;
 
 #[derive(Clone, Debug)]
-pub struct ObjectString {
-    length: usize,
-    chars: Vec<char>,
+pub enum Object {
+    Str(String),
 }
 
-#[derive(Clone, Debug)]
-pub enum Object {
-    Str(ObjectString),
+impl std::cmp::PartialEq for Object {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Object::Str(l), Object::Str(r)) => l == r,
+            //_ => false,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
 pub enum Value {
     Number(f64),
     Bool(bool),
-    Obj(Box<Object>),
+    Obj(Object),
     Nil,
 }
 
@@ -51,6 +54,7 @@ impl std::cmp::PartialEq for Value {
             (Value::Bool(l), Value::Bool(r)) => l == r,
             (Value::Number(l), Value::Number(r)) => l == r,
             (Value::Nil, Value::Nil) => true,
+            (Value::Obj(l), Value::Obj(r)) => l == r,
 
             _ => false,
         }
@@ -71,7 +75,8 @@ impl fmt::Display for Value {
             }
             Self::Bool(b) => write!(f, "{}", b.to_string()),
             Self::Nil => write!(f, "nil"),
-            Self::Obj(_) => write!(f, "Obj"),
+            Self::Obj(Object::Str(s)) => write!(f, "Obj::Str {}", s),
+            //Self::Obj(_) => write!(f, "Obj"),
             //Self::Uninit => write!(f, "uninit"),
             //Self::Break => write!(f, "break"),
         }
@@ -93,6 +98,18 @@ impl From<f64> for Value {
 impl From<bool> for Value {
     fn from(v: bool) -> Self {
         Self::Bool(v.into())
+    }
+}
+
+impl From<&str> for Value {
+    fn from(s: &str) -> Self {
+        Self::Obj(Object::Str(s.into()))
+    }
+}
+
+impl From<String> for Value {
+    fn from(s: String) -> Self {
+        Self::Obj(Object::Str(s))
     }
 }
 

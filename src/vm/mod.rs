@@ -27,7 +27,7 @@ impl VirtualMachine {
         Self {
             chunk: Chunk::init(),
             ip: 0,
-            stack: Vec::with_capacity(STACK_MAX),
+            stack: vec![Default::default(); STACK_MAX],
             stack_top: 0,
             debug: true,
         }
@@ -133,7 +133,7 @@ impl VirtualMachine {
                 | OpCode::Less => {
                     let right = self.pop();
                     let left = self.pop();
-                    self.push(instruction.apply_binary(left, right));
+                    self.push(instruction.apply_binary(left, right).unwrap());
                 }
                 _ => unimplemented!(),
             }

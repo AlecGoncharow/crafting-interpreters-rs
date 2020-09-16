@@ -1,4 +1,5 @@
-use super::value::{Value, ValueArray};
+use super::value::{Object, Value, ValueArray};
+use crate::vm::{InterpretError, InterpretResult};
 use fmt::{Display, Formatter};
 use std::fmt;
 
@@ -26,26 +27,33 @@ pub enum OpCode {
 }
 
 impl OpCode {
-    pub fn apply_binary(&self, left: Value, right: Value) -> Value {
-        let left = left.number().unwrap();
-        let right = right.number().unwrap();
-        if self == &Self::Greater || self == &Self::Less {
-            Value::Bool(match self {
-                Self::Greater => left > right,
-                Self::Less => left < right,
+    pub fn apply_binary(&self, left: Value, right: Value) -> InterpretResult {
+        Ok(match (left, right) {
+            (Value::Obj(Object::Str(left)), Value::Obj(Object::Str(right))) => {
+                Value::from(left + right.as_str())
+            }
 
-                _ => unreachable!(),
-            })
-        } else {
-            Value::Number(match self {
-                Self::Add => left + right,
-                Self::Subtract => left - right,
-                Self::Multiply => left * right,
-                Self::Divide => left / right,
+            (Value::Number(left), Value::Number(right)) => {
+                if self == &Self::Greater || self == &Self::Less {
+                    Value::Bool(match self {
+                        Self::Greater => left > right,
+                        Self::Less => left < right,
 
-                _ => unreachable!(),
-            })
-        }
+                        _ => unreachable!(),
+                    })
+                } else {
+                    Value::Number(match self {
+                        Self::Add => left + right,
+                        Self::Subtract => left - right,
+                        Self::Multiply => left * right,
+                        Self::Divide => left / right,
+
+                        _ => unreachable!(),
+                    })
+                }
+            }
+            _ => return Err(InterpretError::RuntimeError),
+        })
     }
 }
 

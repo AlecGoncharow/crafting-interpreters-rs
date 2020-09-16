@@ -65,6 +65,7 @@ enum ParseFn {
     Binary,
     Number,
     Literal,
+    String,
 }
 
 // (Prefix, Infix, precedence of infix)
@@ -112,7 +113,7 @@ fn rule(token: TokenKind) -> ParseRule {
         TokenKind::LESS => (None, Some(ParseFn::Binary), Precedence::COMPARISON),
         TokenKind::LESS_EQUAL => (None, Some(ParseFn::Binary), Precedence::COMPARISON),
         TokenKind::IDENTIFIER => (None, None, Precedence::NONE),
-        TokenKind::STRING => (None, None, Precedence::NONE),
+        TokenKind::STRING => (Some(ParseFn::String), None, Precedence::NONE),
         TokenKind::NUMBER => (Some(ParseFn::Number), None, Precedence::NONE),
         TokenKind::AND => (None, None, Precedence::NONE),
         TokenKind::CLASS => (None, None, Precedence::NONE),
@@ -355,6 +356,14 @@ impl Parser {
         Ok(())
     }
 
+    fn string(&mut self) -> ParseResult {
+        let previous_token_str = self.previous_token().lexeme.clone();
+        // trim quotes
+        let previous_token_str = &previous_token_str[1..previous_token_str.len() - 1];
+        self.emit_constant(Value::from(previous_token_str));
+        Ok(())
+    }
+
     // helpers
     #[inline(always)]
     fn current_token(&self) -> &Token {
@@ -373,6 +382,7 @@ impl Parser {
             ParseFn::Binary => self.binary(),
             ParseFn::Grouping => self.grouping(),
             ParseFn::Literal => self.literal(),
+            ParseFn::String => self.string(),
         }
     }
 }
