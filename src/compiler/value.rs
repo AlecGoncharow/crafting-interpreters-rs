@@ -1,9 +1,21 @@
 use std::fmt;
 
-#[derive(Clone, Debug, Copy)]
+#[derive(Clone, Debug)]
+pub struct ObjectString {
+    length: usize,
+    chars: Vec<char>,
+}
+
+#[derive(Clone, Debug)]
+pub enum Object {
+    Str(ObjectString),
+}
+
+#[derive(Clone, Debug)]
 pub enum Value {
     Number(f64),
     Bool(bool),
+    Obj(Box<Object>),
     Nil,
 }
 
@@ -59,6 +71,7 @@ impl fmt::Display for Value {
             }
             Self::Bool(b) => write!(f, "{}", b.to_string()),
             Self::Nil => write!(f, "nil"),
+            Self::Obj(_) => write!(f, "Obj"),
             //Self::Uninit => write!(f, "uninit"),
             //Self::Break => write!(f, "break"),
         }

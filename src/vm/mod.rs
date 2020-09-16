@@ -17,7 +17,7 @@ pub type InterpretResult = Result<Value, InterpretError>;
 pub struct VirtualMachine {
     chunk: Chunk,
     ip: usize,
-    stack: [Value; STACK_MAX],
+    stack: Vec<Value>,
     stack_top: usize,
     debug: bool,
 }
@@ -27,7 +27,7 @@ impl VirtualMachine {
         Self {
             chunk: Chunk::init(),
             ip: 0,
-            stack: [Default::default(); STACK_MAX],
+            stack: Vec::with_capacity(STACK_MAX),
             stack_top: 0,
             debug: true,
         }
@@ -44,7 +44,7 @@ impl VirtualMachine {
 
     pub fn pop(&mut self) -> Value {
         self.stack_top -= 1;
-        self.stack[self.stack_top]
+        self.stack[self.stack_top].clone()
     }
 
     pub fn peek(&self, distance: usize) -> &Value {
@@ -72,7 +72,7 @@ impl VirtualMachine {
 
         macro_rules! read_constant {
             () => {{
-                self.chunk.constants.values[read_byte!() as usize]
+                self.chunk.constants.values[read_byte!() as usize].clone()
             }};
         }
 
