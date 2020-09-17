@@ -1,5 +1,5 @@
-use crate::ast::{Expr, Statement};
-use crate::token::{Token, TokenKind, TokenLiteral};
+use super::ast::{Expr, Statement};
+use super::token::{Token, TokenKind, TokenLiteral};
 #[derive(Debug)]
 pub enum ParseError {
     Mismatch(Token, String),

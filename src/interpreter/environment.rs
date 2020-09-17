@@ -1,6 +1,6 @@
-use crate::interpreter::ExecutorError;
-use crate::token::{Token, TokenKind, TokenLiteral};
-use crate::value::Value;
+use super::ExecutorError;
+use super::token::{Token, TokenKind, TokenLiteral};
+use super::value::Value;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
