@@ -1,6 +1,7 @@
 #![feature(or_patterns)]
 #![feature(nll)]
 
+mod collections;
 mod compiler;
 mod interpreter;
 mod lox;
