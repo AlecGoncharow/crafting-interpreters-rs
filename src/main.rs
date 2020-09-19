@@ -1,7 +1,9 @@
 #![feature(or_patterns)]
 #![feature(nll)]
 
+#[allow(dead_code)]
 mod collections;
+
 mod compiler;
 mod interpreter;
 mod lox;
@@ -41,28 +43,6 @@ pub fn run_file(vm: &mut VirtualMachine, path: &str) -> io::Result<Value> {
 
 fn main() -> io::Result<()> {
     let mut vm = VirtualMachine::init();
-    /*
-    let constant = chunk.add_constant(1.2);
-    chunk.write_op(OpCode::Constant);
-    chunk.write(constant);
-
-    chunk.write_op(OpCode::Negate);
-
-    let constant = chunk.add_constant(3.4);
-    chunk.write_op(OpCode::Constant);
-    chunk.write(constant);
-
-    chunk.write_op(OpCode::Add);
-
-    let constant = chunk.add_constant(5.6);
-    chunk.write_op(OpCode::Constant);
-    chunk.write(constant);
-
-    chunk.write_op(OpCode::Divide);
-
-    chunk.write_op(OpCode::Return);
-    */
-
     let use_vm = true;
 
     let args = env::args();

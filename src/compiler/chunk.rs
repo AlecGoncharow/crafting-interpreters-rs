@@ -30,7 +30,7 @@ impl OpCode {
     pub fn apply_binary(&self, left: Value, right: Value) -> InterpretResult {
         Ok(match (left, right) {
             (Value::Obj(Object::Str(left)), Value::Obj(Object::Str(right))) => {
-                Value::from(left + right.as_str())
+                Value::from(left.value + right.value.as_str())
             }
 
             (Value::Number(left), Value::Number(right)) => {

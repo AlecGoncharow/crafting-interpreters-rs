@@ -1,14 +1,48 @@
+use crate::collections::hash_string;
 use std::fmt;
 
 #[derive(Clone, Debug)]
+pub struct ObjString {
+    pub value: String,
+    pub hash: usize,
+}
+
+impl ObjString {
+    pub fn new(value: String) -> Self {
+        Self {
+            hash: hash_string(&value),
+            value,
+        }
+    }
+}
+
+impl From<String> for ObjString {
+    fn from(value: String) -> Self {
+        Self::new(value)
+    }
+}
+
+impl fmt::Display for ObjString {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.value)
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum Object {
-    Str(String),
+    Str(ObjString),
+}
+
+impl Object {
+    pub fn string(s: String) -> Self {
+        Self::Str(ObjString::new(s))
+    }
 }
 
 impl std::cmp::PartialEq for Object {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (Object::Str(l), Object::Str(r)) => l == r,
+            (Object::Str(l), Object::Str(r)) => l.hash == r.hash,
             //_ => false,
         }
     }
@@ -103,13 +137,13 @@ impl From<bool> for Value {
 
 impl From<&str> for Value {
     fn from(s: &str) -> Self {
-        Self::Obj(Object::Str(s.into()))
+        Self::Obj(Object::string(s.into()))
     }
 }
 
 impl From<String> for Value {
     fn from(s: String) -> Self {
-        Self::Obj(Object::Str(s))
+        Self::Obj(Object::string(s))
     }
 }
 
