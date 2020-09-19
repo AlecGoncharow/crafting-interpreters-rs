@@ -72,7 +72,7 @@ impl HashTable {
         loop {
             match &self.entries[index] {
                 Some(entry) => {
-                    if entry.key.hash == key.hash {
+                    if entry.key.hash == key.hash && !entry.is_deleted {
                         return index;
                     }
 
@@ -125,12 +125,34 @@ impl HashTable {
         (index, &self.entries[index])
     }
 
-    pub fn delete(&self, key: &ObjString) -> bool {
+    pub fn delete(&mut self, key: &ObjString) -> bool {
         if self.count == 0 {
             return false;
         }
 
-        unimplemented!();
+        let index = {
+            let (index, entry) = self.get_indexed(key);
+
+            if let Some(entry) = entry {
+                if !entry.is_deleted {
+                    Some(index)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+
+        if let Some(index) = index {
+            let mut entry = self.entries[index].take().unwrap();
+            entry.is_deleted = true;
+            self.entries[index] = Some(entry);
+
+            true
+        } else {
+            false
+        }
     }
 
     pub fn resize(&mut self, capacity: usize) {
@@ -188,6 +210,49 @@ mod test_hashtable {
     }
 
     #[test]
+    fn test_inserts() {
+        let mut table = HashTable::new();
+
+        let key = ObjString::new("Foo".into());
+        let value = Value::Bool(true);
+        table.insert(&key, value);
+        let key = ObjString::new("Bar".into());
+        let value = Value::Bool(true);
+        table.insert(&key, value);
+        let key = ObjString::new("Baz".into());
+        let value = Value::Bool(true);
+        table.insert(&key, value);
+        let key = ObjString::new("Fizz".into());
+        let value = Value::Bool(true);
+        table.insert(&key, value);
+        let key = ObjString::new("Buzz".into());
+        let value = Value::Bool(true);
+        table.insert(&key, value);
+        let key = ObjString::new("FizzBuzz".into());
+        let value = Value::Bool(true);
+        assert!(table.insert(&key, value).is_none());
+
+        // Test Overwrites
+        let key = ObjString::new("FizzBuzz".into());
+        let value = Value::Bool(true);
+        assert!(table.insert(&key, value).is_some());
+
+        let key = ObjString::new("FizzBuzz".into());
+        let value = Value::Bool(true);
+        table.insert(&key, value);
+
+        let key = ObjString::new("FizzBuzz".into());
+        let value = Value::Bool(true);
+        table.insert(&key, value);
+
+        let key = ObjString::new("FizzBuzz".into());
+        let value = Value::Bool(true);
+        table.insert(&key, value);
+
+        assert!(table.count == 6);
+    }
+
+    #[test]
     fn test_get() {
         let mut table = HashTable::new();
 
@@ -197,5 +262,21 @@ mod test_hashtable {
         table.insert(&key, value);
 
         assert!(table.get(&key).is_some());
+    }
+
+    #[test]
+    fn test_delete() {
+        let mut table = HashTable::new();
+
+        let key = ObjString::new("Foo".into());
+        let value = Value::Bool(true);
+
+        table.insert(&key, value);
+
+        assert!(table.get(&key).is_some());
+
+        assert!(table.delete(&key));
+
+        assert!(table.get(&key).is_none());
     }
 }
