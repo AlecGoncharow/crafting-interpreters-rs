@@ -16,7 +16,7 @@ pub fn compile(source: &str) -> Result<Chunk, InterpretError> {
     let tokens = scanner.scan_tokens();
     let mut parser = Parser::new(tokens);
 
-    parser.expression()?;
+    parser.declaration()?;
     parser.consume(TokenKind::EOF, "Expect end of expression.")?;
     parser.end();
 
@@ -282,6 +282,28 @@ impl Parser {
         Ok(())
     }
 
+    // Parser
+
+    fn declaration(&mut self) -> ParseResult {
+        self.statement()
+    }
+
+    fn statement(&mut self) -> ParseResult {
+        if self.match_rule(TokenKind::PRINT) {
+            self.print_statement()
+        } else {
+            self.expression()
+        }
+    }
+
+    fn print_statement(&mut self) -> ParseResult {
+        self.expression()?;
+        self.consume(TokenKind::SEMICOLON, "Expect ';' after value.")?;
+        self.emit_op(OpCode::Print);
+
+        Ok(())
+    }
+
     // === Token  Parser
 
     fn number(&mut self) -> ParseResult {
@@ -373,6 +395,20 @@ impl Parser {
     #[inline(always)]
     fn previous_token(&self) -> &Token {
         &self.tokens[self.current - 1]
+    }
+
+    fn match_rule(&mut self, kind: TokenKind) -> bool {
+        if self.check(kind) {
+            self.advance().unwrap();
+
+            true
+        } else {
+            false
+        }
+    }
+
+    fn check(&self, kind: TokenKind) -> bool {
+        self.current_token().kind == kind
     }
 
     fn parse_fn(&mut self, fun: ParseFn) -> ParseResult {

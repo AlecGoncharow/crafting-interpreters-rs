@@ -23,6 +23,8 @@ pub enum OpCode {
     Greater = 12,
     Less = 13,
 
+    Print = 14,
+
     Nop = 255,
 }
 
@@ -78,6 +80,8 @@ impl From<u8> for OpCode {
             12 => Self::Greater,
             13 => Self::Less,
 
+            14 => Self::Print,
+
             255 => Self::Nop,
             _ => unimplemented!(),
         }
@@ -109,6 +113,8 @@ impl Display for OpCode {
             Self::Equal => write!(f, "OP_EQ"),
             Self::Greater => write!(f, "OP_GREATER"),
             Self::Less => write!(f, "OP_LESS"),
+
+            Self::Print => write!(f, "OP_PRINT"),
         }
     }
 }

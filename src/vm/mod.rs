@@ -92,8 +92,12 @@ impl VirtualMachine {
 
             match instruction {
                 OpCode::Return => {
-                    let pop = self.pop();
-                    return Ok(pop);
+                    if self.stack_top > 0 {
+                        let pop = self.pop();
+                        return Ok(pop);
+                    } else {
+                        return Ok(Value::Nil);
+                    }
                 }
                 OpCode::Constant => {
                     let constant = read_constant!();
@@ -123,6 +127,10 @@ impl VirtualMachine {
                     let a = self.pop();
 
                     self.push(Value::Bool(a == b))
+                }
+
+                OpCode::Print => {
+                    println!("{}", self.pop());
                 }
 
                 OpCode::Add
