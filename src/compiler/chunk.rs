@@ -24,6 +24,9 @@ pub enum OpCode {
     Less = 13,
 
     Print = 14,
+    Pop = 15,
+
+    DefineGlobal = 16,
 
     Nop = 255,
 }
@@ -82,6 +85,10 @@ impl From<u8> for OpCode {
 
             14 => Self::Print,
 
+            15 => Self::Pop,
+
+            16 => Self::DefineGlobal,
+
             255 => Self::Nop,
             _ => unimplemented!(),
         }
@@ -115,6 +122,9 @@ impl Display for OpCode {
             Self::Less => write!(f, "OP_LESS"),
 
             Self::Print => write!(f, "OP_PRINT"),
+
+            Self::Pop => write!(f, "OP_POP"),
+            Self::DefineGlobal => write!(f, "OP_DEFINE_GLOBAL"),
         }
     }
 }

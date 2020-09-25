@@ -9,7 +9,7 @@ use chunk::{Chunk, OpCode};
 use debug::disassemble_chunk;
 use scanner::Scanner;
 use token::{Token, TokenKind};
-use value::Value;
+use value::{Object, Value};
 
 pub fn compile(source: &str) -> Result<Chunk, InterpretError> {
     let mut scanner = Scanner::new(source);
@@ -258,6 +258,61 @@ impl Parser {
         self.emit_op(OpCode::Return);
     }
 
+    // Parser
+
+    fn declaration(&mut self) -> ParseResult {
+        let result = if self.match_rule(TokenKind::VAR) {
+            self.var_declaration()
+        } else {
+            self.statement()
+        };
+
+        if self.panic_mode {
+            self.synchronize();
+        }
+
+        result
+    }
+
+    fn var_declaration(&mut self) -> ParseResult {
+        let global = self.parse_variable("Expect variable name.")?;
+
+        if self.match_rule(TokenKind::EQUAL) {
+            self.expression()?;
+        } else {
+            self.emit_op(OpCode::Nil);
+        }
+
+        self.consume(TokenKind::SEMICOLON, "Expect ';' after declaration.")?;
+
+        self.define_variable(global);
+        Ok(())
+    }
+
+    fn statement(&mut self) -> ParseResult {
+        if self.match_rule(TokenKind::PRINT) {
+            self.print_statement()
+        } else {
+            self.expression_statement()
+        }
+    }
+
+    fn print_statement(&mut self) -> ParseResult {
+        self.expression()?;
+        self.consume(TokenKind::SEMICOLON, "Expect ';' after value.")?;
+        self.emit_op(OpCode::Print);
+
+        Ok(())
+    }
+
+    fn expression_statement(&mut self) -> ParseResult {
+        self.expression()?;
+        self.consume(TokenKind::SEMICOLON, "Expect ';' after value.")?;
+        self.emit_op(OpCode::Pop);
+
+        Ok(())
+    }
+
     // === Expr Parser
     fn expression(&mut self) -> ParseResult {
         self.parse_precedence(Precedence::ASSIGNMENT)
@@ -279,28 +334,6 @@ impl Parser {
                 self.parse_fn(fun)?;
             }
         }
-        Ok(())
-    }
-
-    // Parser
-
-    fn declaration(&mut self) -> ParseResult {
-        self.statement()
-    }
-
-    fn statement(&mut self) -> ParseResult {
-        if self.match_rule(TokenKind::PRINT) {
-            self.print_statement()
-        } else {
-            self.expression()
-        }
-    }
-
-    fn print_statement(&mut self) -> ParseResult {
-        self.expression()?;
-        self.consume(TokenKind::SEMICOLON, "Expect ';' after value.")?;
-        self.emit_op(OpCode::Print);
-
         Ok(())
     }
 
@@ -386,6 +419,22 @@ impl Parser {
         Ok(())
     }
 
+    // Variable stuff
+
+    fn parse_variable(&mut self, msg: &str) -> Result<u8, InterpretError> {
+        self.consume(TokenKind::IDENTIFIER, msg)?;
+        let token = self.previous_token().clone();
+        Ok(self.identifier_constant(token))
+    }
+
+    fn identifier_constant(&mut self, name: Token) -> u8 {
+        self.make_constant(Value::Obj(Object::string(name.lexeme)))
+    }
+
+    fn define_variable(&mut self, global: u8) {
+        self.emit_byte_2(OpCode::DefineGlobal as u8, global);
+    }
+
     // helpers
     #[inline(always)]
     fn current_token(&self) -> &Token {
@@ -419,6 +468,30 @@ impl Parser {
             ParseFn::Grouping => self.grouping(),
             ParseFn::Literal => self.literal(),
             ParseFn::String => self.string(),
+        }
+    }
+
+    fn synchronize(&mut self) {
+        self.panic_mode = false;
+
+        while self.current_token().kind != TokenKind::EOF {
+            if self.previous_token().kind == TokenKind::SEMICOLON {
+                return;
+            }
+
+            match self.current_token().kind {
+                TokenKind::CLASS
+                | TokenKind::FUN
+                | TokenKind::VAR
+                | TokenKind::FOR
+                | TokenKind::IF
+                | TokenKind::WHILE
+                | TokenKind::PRINT
+                | TokenKind::RETURN => break,
+                _ => {
+                    self.advance().unwrap();
+                }
+            }
         }
     }
 }

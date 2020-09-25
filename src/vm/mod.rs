@@ -133,6 +133,10 @@ impl VirtualMachine {
                     println!("{}", self.pop());
                 }
 
+                OpCode::Pop => {
+                    self.pop();
+                }
+
                 OpCode::Add
                 | OpCode::Subtract
                 | OpCode::Multiply
