@@ -65,6 +65,14 @@ impl Value {
         }
     }
 
+    pub fn string(&self) -> Option<&ObjString> {
+        if let Self::Obj(Object::Str(inner)) = self {
+            Some(inner)
+        } else {
+            None
+        }
+    }
+
     pub fn is_truthy(&self) -> bool {
         match self {
             Self::Bool(b) => *b,

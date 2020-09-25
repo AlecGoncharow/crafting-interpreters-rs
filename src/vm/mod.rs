@@ -1,3 +1,4 @@
+use crate::collections::HashTable;
 use crate::compiler;
 use compiler::chunk::{Chunk, OpCode};
 use compiler::compile;
@@ -20,6 +21,7 @@ pub struct VirtualMachine {
     stack: Vec<Value>,
     stack_top: usize,
     debug: bool,
+    globals: HashTable,
 }
 
 impl VirtualMachine {
@@ -30,6 +32,7 @@ impl VirtualMachine {
             stack: vec![Default::default(); STACK_MAX],
             stack_top: 0,
             debug: true,
+            globals: HashTable::new(),
         }
     }
 
@@ -135,6 +138,27 @@ impl VirtualMachine {
 
                 OpCode::Pop => {
                     self.pop();
+                }
+
+                OpCode::DefineGlobal => {
+                    let value = self.pop();
+                    let name = read_constant!();
+                    self.globals.insert(name.string().unwrap(), value);
+                }
+
+                OpCode::GetGlobal => {
+                    let token = read_constant!();
+                    let name = token.string().unwrap();
+
+                    let value = match self.globals.get(name) {
+                        Some(entry) => entry.value.clone(),
+                        None => {
+                            self.runtime_error(&format!("Undefined variable '{}'.", name));
+                            return Err(InterpretError::RuntimeError);
+                        }
+                    };
+
+                    self.push(value);
                 }
 
                 OpCode::Add

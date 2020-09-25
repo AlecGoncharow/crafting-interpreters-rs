@@ -27,6 +27,7 @@ pub enum OpCode {
     Pop = 15,
 
     DefineGlobal = 16,
+    GetGlobal = 17,
 
     Nop = 255,
 }
@@ -88,6 +89,7 @@ impl From<u8> for OpCode {
             15 => Self::Pop,
 
             16 => Self::DefineGlobal,
+            17 => Self::GetGlobal,
 
             255 => Self::Nop,
             _ => unimplemented!(),
@@ -125,6 +127,7 @@ impl Display for OpCode {
 
             Self::Pop => write!(f, "OP_POP"),
             Self::DefineGlobal => write!(f, "OP_DEFINE_GLOBAL"),
+            Self::GetGlobal => write!(f, "OP_GET_GLOBAL"),
         }
     }
 }

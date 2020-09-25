@@ -66,6 +66,7 @@ enum ParseFn {
     Number,
     Literal,
     String,
+    Variable,
 }
 
 // (Prefix, Infix, precedence of infix)
@@ -112,7 +113,7 @@ fn rule(token: TokenKind) -> ParseRule {
         TokenKind::GREATER_EQUAL => (None, Some(ParseFn::Binary), Precedence::COMPARISON),
         TokenKind::LESS => (None, Some(ParseFn::Binary), Precedence::COMPARISON),
         TokenKind::LESS_EQUAL => (None, Some(ParseFn::Binary), Precedence::COMPARISON),
-        TokenKind::IDENTIFIER => (None, None, Precedence::NONE),
+        TokenKind::IDENTIFIER => (Some(ParseFn::Variable), None, Precedence::NONE),
         TokenKind::STRING => (Some(ParseFn::String), None, Precedence::NONE),
         TokenKind::NUMBER => (Some(ParseFn::Number), None, Precedence::NONE),
         TokenKind::AND => (None, None, Precedence::NONE),
@@ -419,6 +420,17 @@ impl Parser {
         Ok(())
     }
 
+    fn variable(&mut self) -> ParseResult {
+        let token = self.previous_token().clone();
+        self.named_variable(token)
+    }
+
+    fn named_variable(&mut self, name: Token) -> ParseResult {
+        let arg = self.identifier_constant(name);
+        self.emit_byte_2(OpCode::GetGlobal as u8, arg);
+        Ok(())
+    }
+
     // Variable stuff
 
     fn parse_variable(&mut self, msg: &str) -> Result<u8, InterpretError> {
@@ -468,6 +480,7 @@ impl Parser {
             ParseFn::Grouping => self.grouping(),
             ParseFn::Literal => self.literal(),
             ParseFn::String => self.string(),
+            ParseFn::Variable => self.variable(),
         }
     }
 
